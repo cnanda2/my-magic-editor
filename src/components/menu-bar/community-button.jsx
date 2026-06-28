@@ -20,6 +20,7 @@ const CommunityButton = ({
         iconSrc={communityIcon}
         iconWidth={20}
         iconHeight={20}
+        disabled
         onClick={onClick}
     >
         <FormattedMessage

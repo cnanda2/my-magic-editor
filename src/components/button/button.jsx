@@ -34,7 +34,8 @@ const ButtonComponent = ({
         <span
             className={classNames(
                 styles.outlinedButton,
-                className
+                className,
+                {[styles.disabled]: disabled}
             )}
             role="button"
             onClick={onClick}

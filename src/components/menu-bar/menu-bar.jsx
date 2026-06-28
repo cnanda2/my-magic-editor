@@ -96,6 +96,9 @@ import editIcon from './icon--edit.svg';
 import addonsIcon from './addons.svg';
 import errorIcon from './tw-error.svg';
 import advancedIcon from './tw-advanced.svg';
+import connectIcon from './icon--connect.svg';
+import bluetoothIcon from './icon--bluetooth.svg';
+import usbIcon from './icon--usb.svg';
 
 import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
@@ -107,6 +110,13 @@ import sharedMessages from '../../lib/shared-messages';
 import SeeInsideButton from './tw-see-inside.jsx';
 import {notScratchDesktop} from '../../lib/isScratchDesktop.js';
 import {APP_NAME} from '../../lib/brand.js';
+
+const HW_BOARDS = [
+    {id: 'arduino_uno', name: 'Arduino Uno', file: 'arduino_uno'},
+    {id: 'arduino_nano', name: 'Arduino Nano', file: 'arduino_nano'},
+    {id: 'arduino_mega', name: 'Arduino Mega', file: 'arduino_mega'},
+    {id: 'esp32', name: 'ESP32', file: 'esp32'}
+];
 
 const ariaMessages = defineMessages({
     tutorials: {
@@ -227,8 +237,38 @@ class MenuBar extends React.Component {
             'handleKeyPress',
             'handleRestoreOption',
             'getSaveToComputerHandler',
-            'restoreOptionMessage'
+            'restoreOptionMessage',
+            'handleBoardOpen',
+            'handleBoardClose',
+            'handleBoardSelect',
+            'handleConnectOpen',
+            'handleConnectClose',
+            'handleSerialClick',
+            'handleBluetoothClick',
+            'handleSerialClose',
+            'handleBluetoothClose',
+            'handleFetchPorts',
+            'handleConnectPort',
+            'handleDisconnect',
+            'handleBoardWarningClose',
+            'handleBoardWarningSelect',
+            'handleConnWarningClose',
+            'handleStageModeClick',
+            'handleUploadModeClick'
         ]);
+        this.state = {
+            hwBoardOpen: false,
+            hwConnectOpen: false,
+            hwSerialOpen: false,
+            hwBluetoothOpen: false,
+            hwBoardWarningOpen: false,
+            hwPorts: [],
+            hwSelectedBoard: null,
+            hwConnectedPort: null,
+            hwConnecting: false,
+            hwActiveMode: 'stage',
+            hwConnWarningOpen: false
+        };
     }
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyPress);
@@ -389,6 +429,144 @@ class MenuBar extends React.Component {
     }
     handleClickSeeInside () {
         this.props.onClickSeeInside();
+    }
+    handleBoardOpen () {
+        this.setState({hwBoardOpen: true, hwConnectOpen: false});
+    }
+    handleBoardClose () {
+        this.setState({hwBoardOpen: false});
+    }
+    handleBoardSelect (board) {
+        if (!window.__hardwareConnection?.port && !this.state.hwConnectedPort) {
+            this.setState({hwConnWarningOpen: true});
+            return;
+        }
+        this.setState({hwBoardOpen: false, hwSelectedBoard: board});
+        const url = `${window.location.origin}/${board.file}.js`;
+        this.props.vm.extensionManager.loadExtensionURL(url)
+            .catch(err => alert(err)); // eslint-disable-line no-alert
+    }
+    handleConnectOpen () {
+        this.setState({hwConnectOpen: true, hwBoardOpen: false});
+    }
+    handleConnectClose () {
+        this.setState({hwConnectOpen: false});
+    }
+    handleSerialClick () {
+        if (!this.state.hwSelectedBoard) {
+            this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
+            return;
+        }
+        this.setState({hwConnectOpen: false});
+        if (navigator.serial) {
+            navigator.serial.requestPort()
+                .then(port => {
+                    this.setState({hwSerialPort: port});
+                    return port.open({baudRate: 115200});
+                })
+                .then(() => {
+                    const port = this.state.hwSerialPort;
+                    let portLabel = 'Web Serial';
+                    try {
+                        const info = port.getInfo ? port.getInfo() : {};
+                        if (info && info.usbVendorId) portLabel = 'USB ' + info.usbVendorId.toString(16).toUpperCase();
+                    } catch (_) {}
+                    window.__hardwareConnection = window.__hardwareConnection || {};
+                    window.__hardwareConnection.port = 'web-serial';
+                    this.setState({hwConnectedPort: portLabel});
+                })
+                .catch(() => {});
+        } else {
+            alert('Web Serial API is not supported in this browser. Use Chrome or Edge.'); // eslint-disable-line no-alert
+        }
+    }
+    handleBluetoothClick () {
+        if (!this.state.hwSelectedBoard) {
+            this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
+            return;
+        }
+        this.setState({hwConnectOpen: false});
+        if (navigator.bluetooth) {
+            navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['battery_service', '0000ffe0-0000-1000-8000-00805f9b34fb']
+            })
+                .then(device => {
+                    this.setState({hwBluetoothDevice: device, hwConnectedPort: device.name || 'Bluetooth'});
+                    return device.gatt.connect();
+                })
+                .then(() => {})
+                .catch(() => {});
+        } else {
+            alert('Web Bluetooth API is not supported in this browser. Use Chrome or Edge.'); // eslint-disable-line no-alert
+        }
+    }
+    handleBoardWarningClose () {
+        this.setState({hwBoardWarningOpen: false});
+    }
+    handleBoardWarningSelect () {
+        this.setState({hwBoardWarningOpen: false, hwBoardOpen: true});
+    }
+    handleConnWarningClose () {
+        this.setState({hwConnWarningOpen: false});
+    }
+    handleStageModeClick () {
+        this.setState({hwActiveMode: 'stage'});
+        window.dispatchEvent(new CustomEvent('hwModeChange', {detail: {mode: 'stage'}}));
+    }
+    handleUploadModeClick () {
+        if (!this.state.hwSelectedBoard) {
+            this.setState({hwBoardWarningOpen: true});
+            return;
+        }
+        this.setState({hwActiveMode: 'upload'});
+        window.dispatchEvent(new CustomEvent('hwModeChange', {detail: {
+            mode: 'upload',
+            board: this.state.hwSelectedBoard
+        }}));
+    }
+    handleSerialClose () {
+        this.setState({hwSerialOpen: false});
+    }
+    handleBluetoothClose () {
+        this.setState({hwBluetoothOpen: false});
+    }
+    handleFetchPorts () {
+        fetch('/api/serial/ports')
+            .then(r => r.json())
+            .then(data => this.setState({hwPorts: Array.isArray(data) ? data : (data.ports || [])}))
+            .catch(() => this.setState({hwPorts: []}));
+    }
+    handleConnectPort (portPath) {
+        this.setState({hwConnecting: true});
+        window.__hardwareConnection = window.__hardwareConnection || {};
+        window.__hardwareConnection.port = portPath;
+        fetch('/api/serial/connect', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({port: portPath, baudRate: 115200})
+        })
+            .then(r => r.json())
+            .then(() => this.setState({
+                hwConnectedPort: portPath,
+                hwSerialOpen: false,
+                hwConnecting: false
+            }))
+            .catch(() => this.setState({
+                hwConnectedPort: portPath,
+                hwSerialOpen: false,
+                hwConnecting: false
+            }));
+    }
+    handleDisconnect () {
+        if (this.state.hwSerialPort) {
+            this.state.hwSerialPort.close()
+                .catch(() => {});
+        }
+        if (window.__hardwareConnection) {
+            window.__hardwareConnection.port = null;
+        }
+        this.setState({hwConnectedPort: null, hwSerialPort: null});
     }
     buildAboutMenu (onClickAbout) {
         if (!onClickAbout) {
@@ -841,6 +1019,236 @@ class MenuBar extends React.Component {
                                 </MenuSection>
                             </MenuBarMenu>
                         </MenuLabel>
+
+                        {/* Board menu */}
+                        <div className={classNames(styles.menuBarItem, styles.hoverable, styles.hwBoardMenu)}>
+                            <div
+                                className={styles.hwMenuTrigger}
+                                onClick={this.handleBoardOpen}
+                            >
+                                <span className={styles.collapsibleLabel}>{'Board'}</span>
+                                <img
+                                    src={dropdownCaret}
+                                    draggable={false}
+                                    width={8}
+                                    height={5}
+                                />
+                            </div>
+                            {this.state.hwBoardOpen && (
+                                <React.Fragment>
+                                    <div
+                                        className={styles.hwModalBackdrop}
+                                        onClick={this.handleBoardClose}
+                                    />
+                                    <div className={styles.hwBoardModal}>
+                                        <div className={styles.hwBoardModalHeader}>
+                                            <span>{'Select Board'}</span>
+                                            <button
+                                                className={styles.hwModalCloseBtn}
+                                                onClick={this.handleBoardClose}
+                                            >
+                                                {'✕'}
+                                            </button>
+                                        </div>
+                                        <div className={styles.hwBoardGrid}>
+                                            {HW_BOARDS.map(board => (
+                                                <div
+                                                    key={board.id}
+                                                    className={styles.hwBoardTile}
+                                                    // eslint-disable-next-line react/jsx-no-bind
+                                                    onClick={() => this.handleBoardSelect(board)}
+                                                >
+                                                    <img
+                                                        src={`/static/extensions/${board.id}/${board.id}-small.svg`}
+                                                        className={styles.hwBoardImg}
+                                                        draggable={false}
+                                                    />
+                                                    <div className={styles.hwBoardName}>{board.name}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            )}
+                        </div>
+
+                        {/* Connect menu */}
+                        <div className={classNames(styles.menuBarItem, styles.hoverable, styles.hwConnectMenu)}>
+                            <div
+                                className={styles.hwMenuTrigger}
+                                onClick={this.handleConnectOpen}
+                            >
+                                <img
+                                    src={connectIcon}
+                                    draggable={false}
+                                    width={20}
+                                    height={20}
+                                />
+                                {this.state.hwConnectedPort && (
+                                    <span className={styles.hwStatusDot} />
+                                )}
+                                <span className={styles.collapsibleLabel}>{'Connect'}</span>
+                                <img
+                                    src={dropdownCaret}
+                                    draggable={false}
+                                    width={8}
+                                    height={5}
+                                />
+                            </div>
+                            {this.state.hwConnectOpen && (
+                                <React.Fragment>
+                                    <div
+                                        className={styles.hwBackdrop}
+                                        onClick={this.handleConnectClose}
+                                    />
+                                    <div className={styles.hwConnectDropdown}>
+                                        {this.state.hwConnectedPort && (
+                                            <div className={styles.hwConnectStatus}>
+                                                <span className={styles.hwStatusDotGreen} />
+                                                <span>{typeof this.state.hwConnectedPort === 'string' ? this.state.hwConnectedPort : String(this.state.hwConnectedPort)}</span>
+                                                <button
+                                                    className={styles.hwDisconnectBtn}
+                                                    onClick={this.handleDisconnect}
+                                                >
+                                                    {'Disconnect'}
+                                                </button>
+                                            </div>
+                                        )}
+                                        <div
+                                            className={styles.hwConnectItem}
+                                            onClick={this.handleSerialClick}
+                                        >
+                                            <img
+                                                src={usbIcon}
+                                                draggable={false}
+                                                width={16}
+                                                height={16}
+                                            />
+                                            {'Serial'}
+                                        </div>
+                                        <div
+                                            className={styles.hwConnectItem}
+                                            onClick={this.handleBluetoothClick}
+                                        >
+                                            <img
+                                                src={bluetoothIcon}
+                                                draggable={false}
+                                                width={16}
+                                                height={16}
+                                            />
+                                            {'Bluetooth'}
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            )}
+                        </div>
+
+                        {/* Serial uses browser native Web Serial API dialog */}
+
+                        {/* Bluetooth uses browser native Web Bluetooth API dialog */}
+
+                        {/* Board not selected warning popup */}
+                        {this.state.hwBoardWarningOpen && (
+                            <React.Fragment>
+                                <div
+                                    className={styles.hwModalBackdrop}
+                                    onClick={this.handleBoardWarningClose}
+                                />
+                                <div className={styles.hwWarningModal}>
+                                    <div className={styles.hwWarningHeader}>
+                                        <span>{'Warning!'}</span>
+                                        <button
+                                            className={styles.hwWarningCloseBtn}
+                                            onClick={this.handleBoardWarningClose}
+                                        >
+                                            {'✕'}
+                                        </button>
+                                    </div>
+                                    <div className={styles.hwWarningBody}>
+                                        <svg
+                                            className={styles.hwWarningIcon}
+                                            viewBox="0 0 80 80"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <rect x="20" y="15" width="40" height="50" rx="3"
+                                                fill="none" stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <rect x="32" y="27" width="16" height="16" rx="2"
+                                                fill="none" stroke="#999" strokeWidth="2"
+                                            />
+                                            <text x="40" y="40" textAnchor="middle"
+                                                dominantBaseline="middle"
+                                                fill="#999" fontSize="14" fontWeight="bold"
+                                            >{'?'}</text>
+                                            <line x1="14" y1="30" x2="20" y2="30"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <line x1="14" y1="40" x2="20" y2="40"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <line x1="14" y1="50" x2="20" y2="50"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <line x1="60" y1="30" x2="66" y2="30"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <line x1="60" y1="40" x2="66" y2="40"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                            <line x1="60" y1="50" x2="66" y2="50"
+                                                stroke="#999" strokeWidth="2.5"
+                                            />
+                                        </svg>
+                                        <p className={styles.hwWarningText}>
+                                            {'Please select the board first.'}
+                                        </p>
+                                    </div>
+                                    <div className={styles.hwWarningFooter}>
+                                        <button
+                                            className={styles.hwSelectBoardBtn}
+                                            onClick={this.handleBoardWarningSelect}
+                                        >
+                                            {'Select a board'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </React.Fragment>
+                        )}
+
+                        {/* Connection warning modal */}
+                        {this.state.hwConnWarningOpen && (
+                            <React.Fragment>
+                                <div
+                                    className={styles.hwModalBackdrop}
+                                    onClick={this.handleConnWarningClose}
+                                />
+                                <div className={styles.hwWarningModal}>
+                                    <div className={styles.hwWarningHeader}>
+                                        <span>{'Connect Your Board'}</span>
+                                        <button
+                                            className={styles.hwWarningCloseBtn}
+                                            onClick={this.handleConnWarningClose}
+                                        >
+                                            {'✕'}
+                                        </button>
+                                    </div>
+                                    <div className={styles.hwWarningBody}>
+                                        <p className={styles.hwWarningText}>
+                                            {'Please connect your Arduino board first. Click the Connect menu and select Serial or Bluetooth.'}
+                                        </p>
+                                    </div>
+                                    <div className={styles.hwWarningFooter}>
+                                        <button
+                                            className={styles.hwSelectBoardBtn}
+                                            onClick={this.handleConnWarningClose}
+                                        >
+                                            {'OK'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </React.Fragment>
+                        )}
+
                         {this.props.isTotallyNormal && (
                             <MenuLabel
                                 open={this.props.modeMenuOpen}
@@ -885,46 +1293,7 @@ class MenuBar extends React.Component {
                             </MenuLabel>
                         )}
 
-                        {this.props.onClickAddonSettings && (
-                            <div
-                                className={classNames(styles.menuBarItem, styles.hoverable)}
-                                onClick={this.props.onClickAddonSettings}
-                            >
-                                <img
-                                    src={addonsIcon}
-                                    draggable={false}
-                                    width={20}
-                                    height={20}
-                                />
-                                <span className={styles.collapsibleLabel}>
-                                    <FormattedMessage
-                                        defaultMessage="Addons"
-                                        description="Button to open addon settings"
-                                        id="tw.menuBar.addons"
-                                    />
-                                </span>
-                            </div>
-                        )}
-                        {this.props.onClickSettingsModal && (
-                            <div
-                                className={classNames(styles.menuBarItem, styles.hoverable)}
-                                onClick={this.props.onClickSettingsModal}
-                            >
-                                <img
-                                    src={advancedIcon}
-                                    draggable={false}
-                                    width={20}
-                                    height={20}
-                                />
-                                <span className={styles.collapsibleLabel}>
-                                    <FormattedMessage
-                                        defaultMessage="Advanced"
-                                        description="Button to open advanced settings menu"
-                                        id="tw.menuBar.advanced"
-                                    />
-                                </span>
-                            </div>
-                        )}
+                        {/* Addons and Advanced hidden */}
                     </div>
 
                     <Divider className={styles.divider} />
@@ -1011,6 +1380,29 @@ class MenuBar extends React.Component {
                             />
                         ) : []))}
                     </div>
+                    {/* Mode label + Stage / Upload toggle buttons */}
+                    <div className={styles.hwModeSwitcher}>
+                        <span className={styles.hwModeLabel}>{'Mode'}</span>
+                        <button
+                            className={classNames(
+                                styles.hwModeSwitchBtn,
+                                {[styles.hwModeSwitchBtnActive]: this.state.hwActiveMode === 'stage'}
+                            )}
+                            onClick={this.handleStageModeClick}
+                        >
+                            {'Stage'}
+                        </button>
+                        <button
+                            className={classNames(
+                                styles.hwModeSwitchBtn,
+                                {[styles.hwModeSwitchBtnActive]: this.state.hwActiveMode === 'upload'}
+                            )}
+                            onClick={this.handleUploadModeClick}
+                        >
+                            {'Upload'}
+                        </button>
+                    </div>
+
                     {/* tw: add a feedback button */}
                     <div className={styles.menuBarItem}>
                         <a
