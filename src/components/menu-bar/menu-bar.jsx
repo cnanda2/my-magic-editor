@@ -722,23 +722,6 @@ class MenuBar extends React.Component {
                                 </MenuBarMenu>
                             </MenuLabel>
                         </div>}
-                        {(this.props.canChangeTheme || this.props.canChangeLanguage) && (<SettingsMenu
-                            canChangeLanguage={this.props.canChangeLanguage}
-                            canChangeTheme={this.props.canChangeTheme}
-                            isRtl={this.props.isRtl}
-                            onClickDesktopSettings={
-                                this.props.onClickDesktopSettings &&
-                                this.handleClickDesktopSettings
-                            }
-                            // eslint-disable-next-line react/jsx-no-bind
-                            onOpenCustomSettings={
-                                this.props.onClickAddonSettings &&
-                                this.props.onClickAddonSettings.bind(null, 'editor-theme3')
-                            }
-                            onRequestClose={this.props.onRequestCloseSettings}
-                            onRequestOpen={this.props.onClickSettings}
-                            settingsMenuOpen={this.props.settingsMenuOpen}
-                        />)}
                         {(this.props.canManageFiles) && (
                             <MenuLabel
                                 open={this.props.fileMenuOpen}
@@ -1019,6 +1002,24 @@ class MenuBar extends React.Component {
                                 </MenuSection>
                             </MenuBarMenu>
                         </MenuLabel>
+
+                        {(this.props.canChangeTheme || this.props.canChangeLanguage) && (<SettingsMenu
+                            canChangeLanguage={this.props.canChangeLanguage}
+                            canChangeTheme={this.props.canChangeTheme}
+                            isRtl={this.props.isRtl}
+                            onClickDesktopSettings={
+                                this.props.onClickDesktopSettings &&
+                                this.handleClickDesktopSettings
+                            }
+                            // eslint-disable-next-line react/jsx-no-bind
+                            onOpenCustomSettings={
+                                this.props.onClickAddonSettings &&
+                                this.props.onClickAddonSettings.bind(null, 'editor-theme3')
+                            }
+                            onRequestClose={this.props.onRequestCloseSettings}
+                            onRequestOpen={this.props.onClickSettings}
+                            settingsMenuOpen={this.props.settingsMenuOpen}
+                        />)}
 
                         {/* Board menu */}
                         <div className={classNames(styles.menuBarItem, styles.hoverable, styles.hwBoardMenu)}>
