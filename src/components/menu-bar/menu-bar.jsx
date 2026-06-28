@@ -254,7 +254,12 @@ class MenuBar extends React.Component {
             'handleBoardWarningSelect',
             'handleConnWarningClose',
             'handleStageModeClick',
-            'handleUploadModeClick'
+            'handleUploadModeClick',
+            'handleFeedbackOpen',
+            'handleFeedbackClose',
+            'handleFeedbackSubmit',
+            'handleFeedbackMessageChange',
+            'handleFeedbackEmailChange'
         ]);
         this.state = {
             hwBoardOpen: false,
@@ -267,7 +272,10 @@ class MenuBar extends React.Component {
             hwConnectedPort: null,
             hwConnecting: false,
             hwActiveMode: 'stage',
-            hwConnWarningOpen: false
+            hwConnWarningOpen: false,
+            feedbackOpen: false,
+            feedbackMessage: '',
+            feedbackEmail: ''
         };
     }
     componentDidMount () {
@@ -513,6 +521,32 @@ class MenuBar extends React.Component {
     handleStageModeClick () {
         this.setState({hwActiveMode: 'stage'});
         window.dispatchEvent(new CustomEvent('hwModeChange', {detail: {mode: 'stage'}}));
+    }
+    handleFeedbackOpen () {
+        this.setState({feedbackOpen: true, feedbackMessage: '', feedbackEmail: '', feedbackSubmitted: false});
+    }
+    handleFeedbackClose () {
+        this.setState({feedbackOpen: false});
+    }
+    handleFeedbackMessageChange (e) {
+        this.setState({feedbackMessage: e.target.value});
+    }
+    handleFeedbackEmailChange (e) {
+        this.setState({feedbackEmail: e.target.value});
+    }
+    handleFeedbackSubmit () {
+        var msg = this.state.feedbackMessage;
+        var email = this.state.feedbackEmail;
+        if (!msg.trim()) return;
+        fetch('/api/feedback', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg, email: email})
+        }).then(function() {
+            this.setState({feedbackSubmitted: true});
+        }.bind(this)).catch(function() {
+            this.setState({feedbackSubmitted: true});
+        }.bind(this));
     }
     handleUploadModeClick () {
         if (!this.state.hwSelectedBoard) {
@@ -1250,6 +1284,98 @@ class MenuBar extends React.Component {
                             </React.Fragment>
                         )}
 
+                        {/* Feedback modal */}
+                        {this.state.feedbackOpen && (
+                            <React.Fragment>
+                                <div
+                                    style={{
+                                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                                        background: 'rgba(0,0,0,0.4)', zIndex: 9999
+                                    }}
+                                    onClick={this.handleFeedbackClose}
+                                />
+                                <div style={{
+                                    position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                                    background: '#fff', borderRadius: 12, padding: 28, zIndex: 10000,
+                                    minWidth: 380, maxWidth: 440, boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                                    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
+                                }}>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
+                                        <span style={{fontSize:20, fontWeight:700, color:'#333'}}>{'Geniusmid Feedback'}</span>
+                                        <button
+                                            onClick={this.handleFeedbackClose}
+                                            style={{background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#999', padding:'0 4px'}}
+                                        >{'✕'}</button>
+                                    </div>
+                                    {this.state.feedbackSubmitted ? (
+                                        <div style={{textAlign:'center', padding:'30px 0'}}>
+                                            <div style={{fontSize:48, marginBottom:12}}>{'✅'}</div>
+                                            <p style={{color:'#555', fontSize:15, lineHeight:1.6}}>
+                                                {'Thank you for your feedback!'}
+                                            </p>
+                                            <button
+                                                onClick={this.handleFeedbackClose}
+                                                style={{
+                                                    marginTop:16, background:'#4c97ff', color:'#fff', border:'none', borderRadius:6,
+                                                    padding:'8px 28px', fontSize:14, fontWeight:600, cursor:'pointer'
+                                                }}
+                                            >{'Close'}</button>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div style={{marginBottom:16}}>
+                                                <label style={{display:'block', marginBottom:6, color:'#555', fontSize:13, fontWeight:600}}>
+                                                    {'Your message'}
+                                                </label>
+                                                <textarea
+                                                    value={this.state.feedbackMessage}
+                                                    onChange={this.handleFeedbackMessageChange}
+                                                    placeholder={'Share your thoughts, suggestions, or report an issue...'}
+                                                    rows={5}
+                                                    style={{
+                                                        width:'100%', padding:'10px 12px', border:'1px solid #ddd', borderRadius:6,
+                                                        fontSize:14, fontFamily:'inherit', resize:'vertical', boxSizing:'border-box',
+                                                        outline:'none'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div style={{marginBottom:20}}>
+                                                <label style={{display:'block', marginBottom:6, color:'#555', fontSize:13, fontWeight:600}}>
+                                                    {'Email (optional)'}
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    value={this.state.feedbackEmail}
+                                                    onChange={this.handleFeedbackEmailChange}
+                                                    placeholder={'your@email.com'}
+                                                    style={{
+                                                        width:'100%', padding:'10px 12px', border:'1px solid #ddd', borderRadius:6,
+                                                        fontSize:14, fontFamily:'inherit', boxSizing:'border-box', outline:'none'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div style={{textAlign:'right'}}>
+                                                <button
+                                                    onClick={this.handleFeedbackClose}
+                                                    style={{
+                                                        marginRight:8, background:'#f0f0f0', color:'#555', border:'1px solid #ddd', borderRadius:6,
+                                                        padding:'8px 20px', fontSize:14, cursor:'pointer'
+                                                    }}
+                                                >{'Cancel'}</button>
+                                                <button
+                                                    onClick={this.handleFeedbackSubmit}
+                                                    style={{
+                                                        background:'#4c97ff', color:'#fff', border:'none', borderRadius:6,
+                                                        padding:'8px 24px', fontSize:14, fontWeight:600, cursor:'pointer'
+                                                    }}
+                                                >{'Send'}</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </React.Fragment>
+                        )}
+
                         {this.props.isTotallyNormal && (
                             <MenuLabel
                                 open={this.props.modeMenuOpen}
@@ -1404,26 +1530,19 @@ class MenuBar extends React.Component {
                         </button>
                     </div>
 
-                    {/* tw: add a feedback button */}
+                    {/* Feedback button */}
                     <div className={styles.menuBarItem}>
-                        <a
-                            className={styles.feedbackLink}
-                            href="https://scratch.mit.edu/users/GarboMuffin/#comments"
-                            rel="noopener noreferrer"
-                            target="_blank"
+                        <button
+                            className={styles.feedbackButton}
+                            onClick={this.handleFeedbackOpen}
+                            style={{
+                                background: 'none', border: '1px solid #ddd', borderRadius: 6,
+                                padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#555',
+                                whiteSpace: 'nowrap'
+                            }}
                         >
-                            {/* todo: icon */}
-                            <Button className={styles.feedbackButton}>
-                                <FormattedMessage
-                                    defaultMessage="{APP_NAME} Feedback"
-                                    description="Button to give feedback in the menu bar"
-                                    id="tw.feedbackButton"
-                                    values={{
-                                        APP_NAME
-                                    }}
-                                />
-                            </Button>
-                        </a>
+                            {'Geniusmid Feedback'}
+                        </button>
                     </div>
                 </div>
 
