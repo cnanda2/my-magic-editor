@@ -966,6 +966,38 @@ const GUIComponent = props => {
                                 <button
                                     onClick={() => setHwConnWarningOpen(false)}
                                     style={{
+                                        marginRight:8, background:'#f0f0f0', color:'#555', border:'1px solid #ddd', borderRadius:6,
+                                        padding:'8px 20px', fontSize:14, cursor:'pointer'
+                                    }}
+                                >{'Cancel'}</button>
+                                <button
+                                    onClick={async () => {
+                                        setHwConnWarningOpen(false);
+                                        try {
+                                            const apiBase = window.location.protocol + '//' + window.location.hostname + ':3001/api';
+                                            const dr = await fetch(apiBase + '/driver/find', { method: 'POST' }).then(r => r.json());
+                                            if (dr.found && dr.port) {
+                                                const cr = await fetch(apiBase + '/serial/connect', {
+                                                    method: 'POST',
+                                                    headers: {'Content-Type': 'application/json'},
+                                                    body: JSON.stringify({path: dr.port, baudRate: 115200, boardType: hwUploadBoard || 'arduino_uno'})
+                                                }).then(r => r.json());
+                                                if (cr.success && cr.device) {
+                                                    window.__hardwareConnection = window.__hardwareConnection || {};
+                                                    window.__hardwareConnection.port = dr.port;
+                                                    window.__hardwareConnection.id = cr.device.id;
+                                                    const ts = new Date().toLocaleTimeString();
+                                                    setHwLogLines(prev => prev.concat('[' + ts + '] Connected to ' + dr.port));
+                                                    setHwBottomTab(0);
+                                                }
+                                            } else {
+                                                alert('No Arduino board detected. Make sure it is plugged in and try again.');
+                                            }
+                                        } catch (_) {
+                                            alert('Could not detect Arduino. Make sure the backend is running on port 3001.');
+                                        }
+                                    }}
+                                    style={{
                                         background:'#4c97ff', color:'#fff', border:'none', borderRadius:6,
                                         padding:'8px 24px', fontSize:14, fontWeight:600, cursor:'pointer'
                                     }}

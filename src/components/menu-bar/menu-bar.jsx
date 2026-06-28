@@ -1119,9 +1119,15 @@ class MenuBar extends React.Component {
                                     width={20}
                                     height={20}
                                 />
-                                {this.state.hwConnectedPort && (
-                                    <span className={styles.hwStatusDot} />
-                                )}
+                                <span
+                                    className={styles.hwStatusDot}
+                                    style={{
+                                        display: 'inline-block',
+                                        width: 12, height: 12, borderRadius: '50%',
+                                        background: this.state.hwConnectedPort ? '#4CAF50' : '#f44336',
+                                        marginRight: 4, verticalAlign: 'middle', flexShrink: 0
+                                    }}
+                                />
                                 <span className={styles.collapsibleLabel}>{'Connect'}</span>
                                 <img
                                     src={dropdownCaret}
@@ -1139,7 +1145,7 @@ class MenuBar extends React.Component {
                                     <div className={styles.hwConnectDropdown}>
                                         {this.state.hwConnectedPort && (
                                             <div className={styles.hwConnectStatus}>
-                                                <span className={styles.hwStatusDotGreen} />
+                                                <span style={{display:'inline-block',width:12,height:12,borderRadius:'50%',background:'#4CAF50',marginRight:6,verticalAlign:'middle',flexShrink:0}} />
                                                 <span>{typeof this.state.hwConnectedPort === 'string' ? this.state.hwConnectedPort : String(this.state.hwConnectedPort)}</span>
                                                 <button
                                                     className={styles.hwDisconnectBtn}
