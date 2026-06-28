@@ -103,7 +103,6 @@
         blocks: [
           { blockType: Scratch.BlockType.LABEL, text: '\u2699 Connection' },
           { opcode: 'onStart', blockType: Scratch.BlockType.HAT, text: 'when Arduino Nano start up', shouldRestartExistingThreads: true },
-          { opcode: 'isConnected', blockType: Scratch.BlockType.BOOLEAN, text: 'connected?' },
           '---',
           { blockType: Scratch.BlockType.LABEL, text: 'Digital I/O' },
           { opcode: 'setPinMode', blockType: Scratch.BlockType.COMMAND, text: 'set pin [PIN] mode [MODE]', arguments: { PIN: { type: Scratch.ArgumentType.NUMBER, menu: 'PIN_MENU', defaultValue: 13 }, MODE: { type: Scratch.ArgumentType.STRING, menu: 'MODE_MENU', defaultValue: 'OUTPUT' } } },
