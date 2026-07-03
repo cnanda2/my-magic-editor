@@ -2,7 +2,7 @@
 @import "../../css/units.css";
 
 .modal-content {
-    width: 480px;
+    width: 600px;
     line-height: 1.75;
 }
 
@@ -117,7 +117,38 @@
 .green-bar {
     background-color: $pen-primary;
 }
+/* ── My Hardware step styles ── */
+.myHardwareStep {
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    gap: 0.75rem;
+}
 
+.myHardwareStepNumber {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    border-radius: 50%;
+    background-color: #4C97FF;
+    color: white;
+    font-weight: bold;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.myHardwareStepIcon {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+}
+
+.myHardwareStepText {
+    flex: 1;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
 .radar-small {
     width: 40px;
     height: 40px;
@@ -220,14 +251,32 @@
 }
 
 .activityArea {
-    height: 165px;
+    height: 130px;
     background-color: $looks-light-transparent;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: .5rem;
 }
+.stepNumberCircle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: #4C97FF;
+    color: white;
+    font-weight: bold;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 0.75rem;
+}
 
+.helpStepContainer {
+    margin-bottom: 1.5rem;
+    align-items: flex-start;
+}
 .scratch-link-help {
     display: flex;
     flex-direction: column;
@@ -370,10 +419,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 1rem;
-    padding-bottom: .75rem;
-    padding-left: .75rem;
-    padding-right: .75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
 }
 
 .bottom-area .bottom-area-item+.bottom-area-item {

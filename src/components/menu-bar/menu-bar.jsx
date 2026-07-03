@@ -245,6 +245,7 @@ class MenuBar extends React.Component {
             'handleConnectClose',
             'handleSerialClick',
             'handleBluetoothClick',
+            'handleWiFiClick',
             'handleSerialClose',
             'handleBluetoothClose',
             'handleFetchPorts',
@@ -259,7 +260,14 @@ class MenuBar extends React.Component {
             'handleFeedbackClose',
             'handleFeedbackSubmit',
             'handleFeedbackMessageChange',
-            'handleFeedbackEmailChange'
+            'handleFeedbackEmailChange',
+            'handlePortPickerClose',
+            'handlePortPickerSelect',
+            'handleRefreshPorts',
+            'fetchAndShowPorts',
+            'tryAutoConnect',
+            'handleShowPortPicker',
+            'handleUploadFirmware'
         ]);
         this.state = {
             hwBoardOpen: false,
@@ -275,14 +283,22 @@ class MenuBar extends React.Component {
             hwConnWarningOpen: false,
             feedbackOpen: false,
             feedbackMessage: '',
-            feedbackEmail: ''
+            feedbackEmail: '',
+            hwPortPickerOpen: false,
+            hwPortPickerPorts: [],
+            hwPortPickerTitle: '',
+            hwPortPickerBoard: null,
+            hwPortPickerSuffix: '',
+            hwPortPickerSkipLoad: false
         };
     }
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyPress);
+        window.addEventListener('hwShowPortPicker', this.handleShowPortPicker);
     }
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyPress);
+        window.removeEventListener('hwShowPortPicker', this.handleShowPortPicker);
     }
     handleClickNew () {
         // if the project is dirty, and user owns the project, we will autosave.
@@ -445,14 +461,79 @@ class MenuBar extends React.Component {
         this.setState({hwBoardOpen: false});
     }
     handleBoardSelect (board) {
-        if (!window.__hardwareConnection?.port && !this.state.hwConnectedPort) {
-            this.setState({hwConnWarningOpen: true});
+        var self = this;
+        this.setState({hwBoardOpen: false, hwSelectedBoard: board});
+        if (window.__hardwareConnection?.port || this.state.hwConnectedPort) {
+            const url = `${window.location.origin}/${board.file}.js`;
+            this.props.vm.extensionManager.loadExtensionURL(url)
+                .catch(err => alert(err));
             return;
         }
-        this.setState({hwBoardOpen: false, hwSelectedBoard: board});
-        const url = `${window.location.origin}/${board.file}.js`;
-        this.props.vm.extensionManager.loadExtensionURL(url)
-            .catch(err => alert(err)); // eslint-disable-line no-alert
+        if (navigator.serial) {
+            navigator.serial.requestPort()
+                .then(function(port) { self.tryAutoConnect(port, board, 'Select Serial Port', false); })
+                .catch(function() { self.fetchAndShowPorts(board, 'Select Serial Port'); });
+        } else {
+            self.fetchAndShowPorts(board, 'Select Serial Port');
+        }
+    }
+    tryAutoConnect(webSerialPort, board, title, skipLoad) {
+        var self = this;
+        var info = webSerialPort.getInfo ? webSerialPort.getInfo() : {};
+        var vid = info && info.usbVendorId ? info.usbVendorId.toString(16).toUpperCase() : null;
+        var pid = info && info.usbProductId ? info.usbProductId.toString(16).toUpperCase() : null;
+        fetch('/api/serial/ports').then(function(r){return r.json();}).then(function(data){
+            var ports = (data && data.ports) || [];
+            var match = null;
+            if (vid) {
+                match = ports.find(function(p) {
+                    return p.vendorId && p.vendorId.toUpperCase() === vid &&
+                        (!pid || (p.productId && p.productId.toUpperCase() === pid));
+                });
+            }
+            if (match) {
+                self.connectToPort(match.path, board, skipLoad);
+            } else if (ports.length > 0) {
+                self.setState({
+                    hwPortPickerOpen: true,
+                    hwPortPickerPorts: ports,
+                    hwPortPickerTitle: title,
+                    hwPortPickerBoard: board
+                });
+            } else {
+                alert('No serial ports found. Make sure your Arduino is connected.');
+            }
+        }).catch(function(){alert('Failed to fetch serial ports.');});
+    }
+    fetchAndShowPorts (board, title, suffix) {
+        var self = this;
+        fetch('/api/serial/ports').then(function(r){return r.json();}).then(function(data){
+            var ports = (data && data.ports) || [];
+            if (ports.length > 0) {
+                self.setState({
+                    hwPortPickerOpen: true,
+                    hwPortPickerPorts: ports,
+                    hwPortPickerTitle: title,
+                    hwPortPickerBoard: board,
+                    hwPortPickerSuffix: suffix || ''
+                });
+            } else {
+                alert('No serial ports found. Make sure your Arduino is connected.');
+            }
+        }).catch(function(){alert('Failed to fetch serial ports.');});
+    }
+    handleShowPortPicker (e) {
+        var boardType = e.detail && e.detail.boardType;
+        var board = HW_BOARDS.find(function(b) { return b.id === boardType; });
+        if (!board) return;
+        this.setState({hwSelectedBoard: board});
+        if (navigator.serial) {
+            navigator.serial.requestPort()
+                .then(function(port) { this.tryAutoConnect(port, board, 'Select Serial Port', true); }.bind(this))
+                .catch(function() { this.fetchAndShowPorts(board, 'Select Serial Port'); }.bind(this));
+        } else {
+            this.fetchAndShowPorts(board, 'Select Serial Port');
+        }
     }
     handleConnectOpen () {
         this.setState({hwConnectOpen: true, hwBoardOpen: false});
@@ -468,24 +549,10 @@ class MenuBar extends React.Component {
         this.setState({hwConnectOpen: false});
         if (navigator.serial) {
             navigator.serial.requestPort()
-                .then(port => {
-                    this.setState({hwSerialPort: port});
-                    return port.open({baudRate: 115200});
-                })
-                .then(() => {
-                    const port = this.state.hwSerialPort;
-                    let portLabel = 'Web Serial';
-                    try {
-                        const info = port.getInfo ? port.getInfo() : {};
-                        if (info && info.usbVendorId) portLabel = 'USB ' + info.usbVendorId.toString(16).toUpperCase();
-                    } catch (_) {}
-                    window.__hardwareConnection = window.__hardwareConnection || {};
-                    window.__hardwareConnection.port = 'web-serial';
-                    this.setState({hwConnectedPort: portLabel});
-                })
-                .catch(() => {});
+                .then(function(port) { this.tryAutoConnect(port, this.state.hwSelectedBoard, 'Select Serial Port'); }.bind(this))
+                .catch(function() { this.fetchAndShowPorts(this.state.hwSelectedBoard, 'Select Serial Port'); }.bind(this));
         } else {
-            alert('Web Serial API is not supported in this browser. Use Chrome or Edge.'); // eslint-disable-line no-alert
+            this.fetchAndShowPorts(this.state.hwSelectedBoard, 'Select Serial Port');
         }
     }
     handleBluetoothClick () {
@@ -497,17 +564,65 @@ class MenuBar extends React.Component {
         if (navigator.bluetooth) {
             navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ['battery_service', '0000ffe0-0000-1000-8000-00805f9b34fb']
-            })
-                .then(device => {
-                    this.setState({hwBluetoothDevice: device, hwConnectedPort: device.name || 'Bluetooth'});
-                    return device.gatt.connect();
-                })
-                .then(() => {})
-                .catch(() => {});
+                optionalServices: []
+            }).then(function() {
+                this.fetchAndShowPorts(this.state.hwSelectedBoard, 'Select Bluetooth Port', ' (BT)');
+            }.bind(this)).catch(function() {
+                this.fetchAndShowPorts(this.state.hwSelectedBoard, 'Select Bluetooth Port', ' (BT)');
+            }.bind(this));
         } else {
-            alert('Web Bluetooth API is not supported in this browser. Use Chrome or Edge.'); // eslint-disable-line no-alert
+            this.fetchAndShowPorts(this.state.hwSelectedBoard, 'Select Bluetooth Port', ' (BT)');
         }
+    }
+    handleWiFiClick () {
+        if (!this.state.hwSelectedBoard) {
+            this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
+            return;
+        }
+        this.setState({hwConnectOpen: false});
+        var ssid = prompt('Enter WiFi SSID:');
+        if (!ssid) return;
+        var pass = prompt('Enter WiFi Password:');
+        if (pass === null) return;
+        fetch('/api/serial/wifi', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ssid: ssid, password: pass, boardType: this.state.hwSelectedBoard})
+        }).then(function(r){return r.json();}).then(function(data){
+            if (data.success) {
+                window.__hardwareConnection = window.__hardwareConnection || {};
+                window.__hardwareConnection.port = 'WiFi';
+                this.setState({hwConnectedPort: 'WiFi: ' + ssid});
+            } else {
+                alert('WiFi connection failed: ' + (data.error || 'Unknown error'));
+            }
+        }.bind(this)).catch(function(){
+            alert('WiFi connection failed. Make sure the backend is running.');
+        });
+    }
+    handleUploadFirmware () {
+        if (!this.state.hwSelectedBoard || !this.state.hwConnectedPort) {
+            this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
+            return;
+        }
+        this.setState({hwConnectOpen: false});
+        var boardObj = this.state.hwSelectedBoard;
+        var boardId = typeof boardObj === 'object' ? (boardObj.id || boardObj.file) : boardObj;
+        var portPath = window.__hardwareConnection && window.__hardwareConnection.port;
+        if (!portPath) { alert('Not connected to any port.'); return; }
+        fetch('/api/firmware/upload-stage', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({boardType: boardId, port: portPath})
+        }).then(function(r){return r.json();}).then(function(d){
+            if (d.success) {
+                if (d.device) {
+                    window.__hardwareConnection = { id: d.device.id, port: d.device.path, board: boardId, baudRate: d.device.baudRate };
+                }
+                alert('Firmware uploaded successfully!');
+            }
+            else { alert('Firmware upload failed: ' + (d.error || 'Unknown error')); }
+        }).catch(function(e){alert('Firmware upload error: '+e.message);});
     }
     handleBoardWarningClose () {
         this.setState({hwBoardWarningOpen: false});
@@ -547,6 +662,48 @@ class MenuBar extends React.Component {
         }.bind(this)).catch(function() {
             this.setState({feedbackSubmitted: true});
         }.bind(this));
+    }
+    connectToPort (portPath, board, skipLoad) {
+        var boardObj = board || this.state.hwSelectedBoard;
+        var boardId = typeof boardObj === 'object' ? (boardObj.id || boardObj.file) : boardObj;
+        var suffix = this.state.hwPortPickerSuffix || '';
+        var self = this;
+        fetch('/api/serial/disconnect-all', {method: 'POST'}).catch(function(){}).then(function(){
+        return fetch('/api/serial/connect', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: portPath, baudRate: 115200, boardType: boardId})
+        }).then(function(r){return r.json();}).then(function(cr){
+            if (cr.success && cr.device) {
+                window.__hardwareConnection = window.__hardwareConnection || {};
+                window.__hardwareConnection.port = portPath;
+                window.__hardwareConnection.id = cr.device.id;
+                self.setState({hwConnectedPort: portPath + suffix, hwPortPickerOpen: false, hwPortPickerSuffix: ''});
+                if (!skipLoad && boardObj && boardObj.file) {
+                    const url = `${window.location.origin}/${boardObj.file}.js`;
+                    self.props.vm.extensionManager.loadExtensionURL(url)
+                        .catch(function(e){alert('Extension load error: '+e.message);});
+                }
+            } else {
+                alert('Connection failed: ' + (cr.error || 'Unknown error'));
+            }
+        }).catch(function(e){alert('Connect error: '+e.message);});
+    });
+    }
+    handlePortPickerClose () {
+        this.setState({hwPortPickerOpen: false, hwPortPickerPorts: [], hwPortPickerBoard: null});
+    }
+    handlePortPickerSelect (portPath) {
+        var skipLoad = this.state.hwPortPickerSkipLoad;
+        this.setState({hwPortPickerSkipLoad: false});
+        this.connectToPort(portPath, this.state.hwPortPickerBoard, skipLoad);
+    }
+    handleRefreshPorts () {
+        var self = this;
+        fetch('/api/serial/ports').then(function(r){return r.json();}).then(function(data){
+            var ports = (data && data.ports) || [];
+            self.setState({hwPortPickerPorts: ports});
+        }).catch(function(){});
     }
     handleUploadModeClick () {
         if (!this.state.hwSelectedBoard) {
@@ -597,9 +754,10 @@ class MenuBar extends React.Component {
             this.state.hwSerialPort.close()
                 .catch(() => {});
         }
-        if (window.__hardwareConnection) {
-            window.__hardwareConnection.port = null;
+        if (window.__hardwareConnection && window.__hardwareConnection.id) {
+            fetch('/api/serial/disconnect/' + window.__hardwareConnection.id, {method: 'POST'}).catch(function(){});
         }
+        window.__hardwareConnection = null;
         this.setState({hwConnectedPort: null, hwSerialPort: null});
     }
     buildAboutMenu (onClickAbout) {
@@ -1179,6 +1337,13 @@ class MenuBar extends React.Component {
                                             />
                                             {'Bluetooth'}
                                         </div>
+                                        <div
+                                            className={styles.hwConnectItem}
+                                            onClick={this.handleUploadFirmware}
+                                        >
+                                            <span style={{marginRight:8}}>{'⚡'}</span>
+                                            {'Upload Firmware'}
+                                        </div>
                                     </div>
                                 </React.Fragment>
                             )}
@@ -1284,6 +1449,72 @@ class MenuBar extends React.Component {
                                             onClick={this.handleConnWarningClose}
                                         >
                                             {'OK'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </React.Fragment>
+                        )}
+
+                        {/* Port picker modal */}
+                        {this.state.hwPortPickerOpen && (
+                            <React.Fragment>
+                                <div
+                                    className={styles.hwModalBackdrop}
+                                    onClick={this.handlePortPickerClose}
+                                />
+                                <div className={styles.hwPortModal}>
+                                    <div className={styles.hwPortModalHeader}>
+                                        <span>{this.state.hwPortPickerTitle || 'Select Port'}</span>
+                                        <button
+                                            className={styles.hwModalCloseBtn}
+                                            onClick={this.handlePortPickerClose}
+                                        >
+                                            {'✕'}
+                                        </button>
+                                    </div>
+                                    <div className={styles.hwPortModalBody}>
+                                        {this.state.hwPortPickerPorts.length === 0 ? (
+                                            <div className={styles.hwNoPortsMsg}>
+                                                {'No serial ports found. Make sure your Arduino is connected.'}
+                                            </div>
+                                        ) : (
+                                            <div className={styles.hwPortList}>
+                                                {this.state.hwPortPickerPorts.map(function(p) {
+                                                    return (
+                                                        <div
+                                                            key={p.path}
+                                                            className={styles.hwPortRow}
+                                                        >
+                                                            <div className={styles.hwPortInfo}>
+                                                                <span className={styles.hwPortName}>
+                                                                    {p.path}
+                                                                </span>
+                                                                {p.manufacturer ? (
+                                                                    <span className={styles.hwPortMfr}>
+                                                                        {p.manufacturer}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <button
+                                                                className={styles.hwPortConnectBtn}
+                                                                onClick={function() {
+                                                                    this.handlePortPickerSelect(p.path);
+                                                                }.bind(this)}
+                                                            >
+                                                                {'Connect'}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                }.bind(this))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className={styles.hwPortModalFooter}>
+                                        <button
+                                            className={styles.hwRefreshBtn}
+                                            onClick={this.handleRefreshPorts}
+                                        >
+                                            {'Refresh'}
                                         </button>
                                     </div>
                                 </div>

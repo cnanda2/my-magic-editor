@@ -158,6 +158,7 @@ const Footer = () => (
                     </a>
                 </div>
                 <div className={styles.footerSection}>
+                    {/* Feedback link hidden 
                     <a href="https://scratch.mit.edu/users/GarboMuffin/#comments">
                         <FormattedMessage
                             defaultMessage="Feedback & Bugs"
@@ -165,6 +166,7 @@ const Footer = () => (
                             id="tw.feedback"
                         />
                     </a>
+                    */}
                     <a href="https://github.com/TurboWarp/">
                         <FormattedMessage
                             defaultMessage="Source Code"
@@ -236,7 +238,6 @@ class Interface extends React.Component {
                             canChangeLanguage
                             canManageFiles
                             canChangeTheme
-                            enableSeeInside
                             onClickAddonSettings={handleClickAddonSettings}
                         />
                     </div>

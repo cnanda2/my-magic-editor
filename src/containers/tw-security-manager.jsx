@@ -30,6 +30,12 @@ const isTrustedExtension = url => (
     // For development.
     url.startsWith('http://localhost:8000/') ||
 
+    // Always trust our custom hardware extension.
+    url.endsWith('/myhardware.js') ||
+
+    // Trust extensions served from the same origin
+    url.startsWith(window.location.origin) ||
+
     extensionsTrustedByUser.has(url)
 );
 

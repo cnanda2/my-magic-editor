@@ -826,7 +826,10 @@ const makeToolboxXML = function (isInitialSetup, isStage = true, targetId, categ
         everything.push(gap, turbowarpXML);
     }
 
+    // Filter out unwanted extension categories
+    const hiddenCategories = ['music', 'pen', 'text2speech', 'translate', 'addons', 'a-b'];
     for (const extensionCategory of categoriesXML) {
+        if (hiddenCategories.includes(extensionCategory.id)) continue;
         everything.push(gap, extensionCategory.xml);
     }
 

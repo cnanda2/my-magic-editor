@@ -1,23 +1,11 @@
 import React from 'react';
-import {FormattedMessage} from 'react-intl';
-
-import musicIconURL from './music/music.png';
-import musicInsetIconURL from './music/music-small.svg';
-
-import penIconURL from './pen/pen.png';
-import penInsetIconURL from './pen/pen-small.svg';
+import { FormattedMessage } from 'react-intl';
 
 import videoSensingIconURL from './videoSensing/video-sensing.png';
 import videoSensingInsetIconURL from './videoSensing/video-sensing-small.svg';
 
 import faceSensingIconURL from './faceSensing/face-sensing.svg';
 import faceSensingInsetIconURL from './faceSensing/face-sensing-small.svg';
-
-import text2speechIconURL from './text2speech/text2speech.png';
-import text2speechInsetIconURL from './text2speech/text2speech-small.svg';
-
-import translateIconURL from './translate/translate.png';
-import translateInsetIconURL from './translate/translate-small.png';
 
 import makeymakeyIconURL from './makeymakey/makeymakey.png';
 import makeymakeyInsetIconURL from './makeymakey/makeymakey-small.svg';
@@ -27,12 +15,34 @@ import microbitInsetIconURL from './microbit/microbit-small.svg';
 import microbitConnectionIconURL from './microbit/microbit-illustration.svg';
 import microbitConnectionSmallIconURL from './microbit/microbit-small.svg';
 
+// Custom board images — loaded from static/ folder so users can replace them
+const _root = (typeof process !== 'undefined' && process.env && process.env.ROOT) || './';
+const arduinoUnoIconURL = _root + 'extensions/arduino_uno/arduino_uno.svg';
+const arduinoUnoInsetIconURL = _root + 'extensions/arduino_uno/arduino_uno-small.svg';
+const arduinoUnoConnectionIconURL = _root + 'extensions/arduino_uno/arduino_uno.svg';
+const arduinoUnoConnectionSmallIconURL = _root + 'extensions/arduino_uno/arduino_uno-small.svg';
+
+const arduinoNanoIconURL = _root + 'extensions/arduino_nano/arduino_nano.svg';
+const arduinoNanoInsetIconURL = _root + 'extensions/arduino_nano/arduino_nano-small.svg';
+const arduinoNanoConnectionIconURL = _root + 'extensions/arduino_nano/arduino_nano.svg';
+const arduinoNanoConnectionSmallIconURL = _root + 'extensions/arduino_nano/arduino_nano-small.svg';
+
+const arduinoMegaIconURL = _root + 'extensions/arduino_mega/arduino_mega.svg';
+const arduinoMegaInsetIconURL = _root + 'extensions/arduino_mega/arduino_mega-small.svg';
+const arduinoMegaConnectionIconURL = _root + 'extensions/arduino_mega/arduino_mega.svg';
+const arduinoMegaConnectionSmallIconURL = _root + 'extensions/arduino_mega/arduino_mega-small.svg';
+
+const esp32IconURL = _root + 'extensions/esp32/esp32.svg';
+const esp32InsetIconURL = _root + 'extensions/esp32/esp32-small.svg';
+const esp32ConnectionIconURL = _root + 'extensions/esp32/esp32.svg';
+const esp32ConnectionSmallIconURL = _root + 'extensions/esp32/esp32-small.svg';
+
 import ev3IconURL from './ev3/ev3.png';
 import ev3InsetIconURL from './ev3/ev3-small.svg';
 import ev3ConnectionIconURL from './ev3/ev3-hub-illustration.svg';
 import ev3ConnectionSmallIconURL from './ev3/ev3-small.svg';
 
-import wedo2IconURL from './wedo2/wedo.png'; // TODO: Rename file names to match variable/prop names?
+import wedo2IconURL from './wedo2/wedo.png';
 import wedo2InsetIconURL from './wedo2/wedo-small.svg';
 import wedo2ConnectionIconURL from './wedo2/wedo-illustration.svg';
 import wedo2ConnectionSmallIconURL from './wedo2/wedo-small.svg';
@@ -53,51 +63,16 @@ import twIcon from './tw/tw.svg';
 import customExtensionIcon from './custom/custom.svg';
 import returnIcon from './custom/return.svg';
 import galleryIcon from './gallery/gallery.svg';
-import {APP_NAME} from '../../brand';
+import { APP_NAME } from '../../brand';
+
+
+// URL helpers for board extension scripts
+const unoURL = new URL('arduino_uno.js', window.location.href).href;
+const nanoURL = new URL('arduino_nano.js', window.location.href).href;
+const megaURL = new URL('arduino_mega.js', window.location.href).href;
+const esp32URL = new URL('esp32.js', window.location.href).href;
 
 export default [
-    {
-        name: (
-            <FormattedMessage
-                defaultMessage="Music"
-                description="Name for the 'Music' extension"
-                id="gui.extension.music.name"
-            />
-        ),
-        extensionId: 'music',
-        iconURL: musicIconURL,
-        insetIconURL: musicInsetIconURL,
-        description: (
-            <FormattedMessage
-                defaultMessage="Play instruments and drums."
-                description="Description for the 'Music' extension"
-                id="gui.extension.music.description"
-            />
-        ),
-        tags: ['scratch'],
-        featured: true
-    },
-    {
-        name: (
-            <FormattedMessage
-                defaultMessage="Pen"
-                description="Name for the 'Pen' extension"
-                id="gui.extension.pen.name"
-            />
-        ),
-        extensionId: 'pen',
-        iconURL: penIconURL,
-        insetIconURL: penInsetIconURL,
-        description: (
-            <FormattedMessage
-                defaultMessage="Draw with your sprites."
-                description="Description for the 'Pen' extension"
-                id="gui.extension.pen.description"
-            />
-        ),
-        tags: ['scratch'],
-        featured: true
-    },
     {
         name: (
             <FormattedMessage
@@ -140,52 +115,6 @@ export default [
         ),
         tags: ['scratch'],
         featured: true
-    },
-    {
-        name: (
-            <FormattedMessage
-                defaultMessage="Text to Speech"
-                description="Name for the Text to Speech extension"
-                id="gui.extension.text2speech.name"
-            />
-        ),
-        extensionId: 'text2speech',
-        collaborator: 'Amazon Web Services',
-        iconURL: text2speechIconURL,
-        insetIconURL: text2speechInsetIconURL,
-        description: (
-            <FormattedMessage
-                defaultMessage="Make your projects talk."
-                description="Description for the Text to speech extension"
-                id="gui.extension.text2speech.description"
-            />
-        ),
-        tags: ['scratch'],
-        featured: true,
-        internetConnectionRequired: true
-    },
-    {
-        name: (
-            <FormattedMessage
-                defaultMessage="Translate"
-                description="Name for the Translate extension"
-                id="gui.extension.translate.name"
-            />
-        ),
-        extensionId: 'translate',
-        collaborator: 'Google',
-        iconURL: translateIconURL,
-        insetIconURL: translateInsetIconURL,
-        description: (
-            <FormattedMessage
-                defaultMessage="Translate text into many languages."
-                description="Description for the Translate extension"
-                id="gui.extension.translate.description"
-            />
-        ),
-        tags: ['scratch'],
-        featured: true,
-        internetConnectionRequired: true
     },
     {
         name: 'Makey Makey',
@@ -361,7 +290,6 @@ export default [
         helpLink: 'https://scratch.mit.edu/vernier'
     },
     {
-        // not really an extension, but it's easiest to present it as one
         name: (
             <FormattedMessage
                 defaultMessage="Custom Reporters"
@@ -425,9 +353,141 @@ export default [
         ),
         tags: ['tw'],
         featured: true
-        // Not marked as incompatible with Scratch so that clicking on it doesn't show a prompt
+    },
+
+    // ── Arduino Uno ──
+    {
+        name: 'Arduino Uno',
+        extensionId: 'arduinoUno',
+        collaborator: 'Arduino',
+        iconURL: arduinoUnoIconURL,
+        insetIconURL: arduinoUnoInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Connect and control an Arduino Uno board."
+                description="Description for the Arduino Uno extension"
+                id="gui.extension.arduinoUno.description"
+            />
+        ),
+        tags: ['scratch'],
+        featured: true,
+        disabled: false,
+        bluetoothRequired: false,
+        internetConnectionRequired: false,
+        launchPeripheralConnectionFlow: false,
+        useAutoScan: false,
+        connectionIconURL: arduinoUnoConnectionIconURL,
+        connectionSmallIconURL: arduinoUnoConnectionSmallIconURL,
+        connectingMessage: (
+            <FormattedMessage
+                defaultMessage="Connecting to Arduino Uno..."
+                description="Message shown while connecting to Arduino Uno"
+                id="gui.extension.arduinoUno.connectingMessage"
+            />
+        ),
+        extensionURL: unoURL
+    },
+
+    // ── Arduino Nano ──
+    {
+        name: 'Arduino Nano',
+        extensionId: 'arduinoNano',
+        collaborator: 'Arduino',
+        iconURL: arduinoNanoIconURL,
+        insetIconURL: arduinoNanoInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Connect and control an Arduino Nano board."
+                description="Description for the Arduino Nano extension"
+                id="gui.extension.arduinoNano.description"
+            />
+        ),
+        tags: ['scratch'],
+        featured: true,
+        disabled: false,
+        bluetoothRequired: false,
+        internetConnectionRequired: false,
+        launchPeripheralConnectionFlow: false,
+        useAutoScan: false,
+        connectionIconURL: arduinoNanoConnectionIconURL,
+        connectionSmallIconURL: arduinoNanoConnectionSmallIconURL,
+        connectingMessage: (
+            <FormattedMessage
+                defaultMessage="Connecting to Arduino Nano..."
+                description="Message shown while connecting to Arduino Nano"
+                id="gui.extension.arduinoNano.connectingMessage"
+            />
+        ),
+        extensionURL: nanoURL
+    },
+
+    // ── Arduino Mega 2560 ──
+    {
+        name: 'Arduino Mega 2560',
+        extensionId: 'arduinoMega',
+        collaborator: 'Arduino',
+        iconURL: arduinoMegaIconURL,
+        insetIconURL: arduinoMegaInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Connect and control an Arduino Mega 2560 board."
+                description="Description for the Arduino Mega 2560 extension"
+                id="gui.extension.arduinoMega.description"
+            />
+        ),
+        tags: ['scratch'],
+        featured: true,
+        disabled: false,
+        bluetoothRequired: false,
+        internetConnectionRequired: false,
+        launchPeripheralConnectionFlow: false,
+        useAutoScan: false,
+        connectionIconURL: arduinoMegaConnectionIconURL,
+        connectionSmallIconURL: arduinoMegaConnectionSmallIconURL,
+        connectingMessage: (
+            <FormattedMessage
+                defaultMessage="Connecting to Arduino Mega 2560..."
+                description="Message shown while connecting to Arduino Mega 2560"
+                id="gui.extension.arduinoMega.connectingMessage"
+            />
+        ),
+        extensionURL: megaURL
+    },
+
+    // ── ESP32 ──
+    {
+        name: 'ESP32',
+        extensionId: 'esp32',
+        collaborator: 'Espressif',
+        iconURL: esp32IconURL,
+        insetIconURL: esp32InsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Connect and control an ESP32 board over WiFi."
+                description="Description for the ESP32 extension"
+                id="gui.extension.esp32.description"
+            />
+        ),
+        tags: ['scratch'],
+        featured: true,
+        disabled: false,
+        bluetoothRequired: false,
+        internetConnectionRequired: false,
+        launchPeripheralConnectionFlow: false,
+        useAutoScan: false,
+        connectionIconURL: esp32ConnectionIconURL,
+        connectionSmallIconURL: esp32ConnectionSmallIconURL,
+        connectingMessage: (
+            <FormattedMessage
+                defaultMessage="Connecting to ESP32..."
+                description="Message shown while connecting to ESP32"
+                id="gui.extension.esp32.connectingMessage"
+            />
+        ),
+        extensionURL: esp32URL
     }
 ];
+
 
 export const galleryLoading = {
     name: (
@@ -445,7 +505,6 @@ export const galleryLoading = {
     iconURL: galleryIcon,
     description: (
         <FormattedMessage
-            // eslint-disable-next-line max-len
             defaultMessage="Loading extension gallery..."
             description="Appears while loading extension list from the custom extension gallery"
             id="tw.extensionGallery.loading"
@@ -471,7 +530,6 @@ export const galleryMore = {
     iconURL: galleryIcon,
     description: (
         <FormattedMessage
-            // eslint-disable-next-line max-len
             defaultMessage="Learn more about extensions at extensions.turbowarp.org."
             description="Appears after the extension list from the gallery was loaded successfully"
             id="tw.extensionGallery.more"
@@ -497,7 +555,6 @@ export const galleryError = {
     iconURL: galleryIcon,
     description: (
         <FormattedMessage
-            // eslint-disable-next-line max-len
             defaultMessage="Error loading extension gallery. Visit extensions.turbowarp.org to find more extensions."
             description="Appears when an error occurred loading extension list from the custom extension gallery"
             id="tw.extensionGallery.error"

@@ -95,6 +95,13 @@ const BOARD_PREFIX = {
     esp32: 'esp32'
 };
 
+const BOARD_FQBN = {
+    arduino_uno: 'arduino:avr:uno',
+    arduino_nano: 'arduino:avr:nano',
+    arduino_mega: 'arduino:avr:mega:cpu=atmega2560',
+    esp32: 'esp32:esp32:esp32'
+};
+
 function convertBlocksToCpp (vm, board) {
     if (!vm || !vm.runtime) return CPP_TEMPLATE;
 
@@ -384,7 +391,6 @@ const GUIComponent = props => {
     const [hwBottomTab, setHwBottomTab] = React.useState(0);
     const [hwLogLines, setHwLogLines] = React.useState([]);
     const [hwCodeLocked, setHwCodeLocked] = React.useState(true);
-    const [hwConnWarningOpen, setHwConnWarningOpen] = React.useState(false);
     const hwLineNumRef = React.useRef(null);
 
     const vmRef = React.useRef(props.vm);
@@ -800,49 +806,111 @@ const GUIComponent = props => {
                                             onClick={() => setHwCodeLocked(!hwCodeLocked)}
                                         >{hwCodeLocked ? '🔒' : '🔓'}</button>
                                         <div className={styles.hwCodePanelSpacer} />
+                                        <div className={styles.hwCodePanelDivider} />
                                         <button
-                                            className={styles.hwCodeIconBtn}
+                                            className={styles.hwClearBtn}
                                             title="Clear Log"
                                             // eslint-disable-next-line react/jsx-no-bind
                                             onClick={() => setHwLogLines([])}
-                                        >{'Clear Log'}</button>
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                                                <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                                <line x1="10" y1="11" x2="10" y2="17" />
+                                                <line x1="14" y1="11" x2="14" y2="17" />
+                                            </svg>
+                                        </button>
                                         <button
-                                            className={styles.hwCodeIconBtn}
+                                            className={styles.hwClearBtn}
                                             title="Clear Code"
                                             // eslint-disable-next-line react/jsx-no-bind
                                             onClick={() => setHwUploadCode(CPP_TEMPLATE)}
-                                        >{'Clear Code'}</button>
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                                                <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                                <line x1="10" y1="11" x2="10" y2="17" />
+                                                <line x1="14" y1="11" x2="14" y2="17" />
+                                            </svg>
+                                        </button>
                                         <button
                                             className={styles.hwUploadCodeBtn}
                                             // eslint-disable-next-line react/jsx-no-bind
                                             onClick={async () => {
-                                                var port2 = window.__hardwareConnection?.port;
-                                                if (!port2) {
-                                                    setHwConnWarningOpen(true);
-                                                    return;
-                                                }
                                                 const ts = new Date().toLocaleTimeString();
-                                                setHwLogLines(prev => prev.concat('[' + ts + '] Compiling and uploading...'));
+                                                setHwLogLines(prev => prev.concat('[' + ts + '] Starting upload...'));
                                                 setHwBottomTab(0);
                                                 try {
                                                     const apiBase = window.location.protocol + '//' + window.location.hostname + ':3001/api';
-                                                    if (!port2 || port2 === 'auto') {
-                                                        try {
-                                                            const dr = await fetch(apiBase + '/driver/find', { method: 'POST' }).then(r => r.json());
-                                                            if (dr.found && dr.port) port2 = dr.port;
-                                                        } catch (_) {}
-                                                    }
+                                                    var port2 = window.__hardwareConnection?.port;
+                                                    
+                                                    // Detect COM Port - if not connected, show port picker
                                                     if (!port2) {
-                                                        setHwLogLines(prev => prev.concat('[' + new Date().toLocaleTimeString() + '] ERROR: No port detected. Connect your Arduino first.'));
-                                                        return;
+                                                        const data = await fetch(apiBase + '/serial/ports').then(r => r.json());
+                                                        const ports = (data && data.ports) || [];
+                                                        if (ports.length === 0) {
+                                                            setHwLogLines(prev => prev.concat('[' + new Date().toLocaleTimeString() + '] ERROR: No serial ports found. Connect your Arduino.'));
+                                                            return;
+                                                        }
+                                                        port2 = await new Promise((resolve) => {
+                                                            const overlay = document.createElement('div');
+                                                            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:999999;display:flex;align-items:center;justify-content:center;';
+                                                            const dialog = document.createElement('div');
+                                                            dialog.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:340px;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:Arial,sans-serif;';
+                                                            dialog.innerHTML = '<h3 style="margin:0 0 6px;color:#333;font-size:18px;">Select Serial Port</h3><p style="margin:0 0 12px;color:#666;font-size:13px;">Available ports:</p>';
+                                                            var list = document.createElement('div');
+                                                            list.style.cssText = 'max-height:280px;overflow-y:auto;';
+                                                            ports.forEach(function(p) {
+                                                                var btn = document.createElement('button');
+                                                                btn.textContent = p.path + (p.manufacturer ? ' (' + p.manufacturer + ')' : '');
+                                                                btn.style.cssText = 'display:block;width:100%;padding:12px 14px;margin:4px 0;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#f8f8f8;text-align:left;font-size:14px;';
+                                                                btn.onmouseover = function(){this.style.background='#e8f4f8';this.style.borderColor='#00979D';};
+                                                                btn.onmouseout = function(){this.style.background='#f8f8f8';this.style.borderColor='#ddd';};
+                                                                btn.onclick = function() { overlay.remove(); resolve(p.path); };
+                                                                list.appendChild(btn);
+                                                            });
+                                                            dialog.appendChild(list);
+                                                            var cancel = document.createElement('button');
+                                                            cancel.textContent = 'Cancel';
+                                                            cancel.style.cssText = 'margin-top:14px;padding:10px 24px;border:1px solid #ccc;border-radius:6px;cursor:pointer;background:#f0f0f0;font-size:14px;display:block;width:100%;';
+                                                            cancel.onmouseover = function(){this.style.background='#e0e0e0';};
+                                                            cancel.onmouseout = function(){this.style.background='#f0f0f0';};
+                                                            cancel.onclick = function(){overlay.remove(); resolve(null);};
+                                                            dialog.appendChild(cancel);
+                                                            overlay.appendChild(dialog);
+                                                            document.body.appendChild(overlay);
+                                                        });
+                                                        if (!port2) {
+                                                            setHwLogLines(prev => prev.concat('[' + new Date().toLocaleTimeString() + '] Upload cancelled.'));
+                                                            return;
+                                                        }
+                                                        // Connect to selected port
+                                                        const cr = await fetch(apiBase + '/serial/connect', {
+                                                            method: 'POST',
+                                                            headers: {'Content-Type': 'application/json'},
+                                                            body: JSON.stringify({path: port2, baudRate: 115200, boardType: hwUploadBoard ? hwUploadBoard.id : 'arduino_uno'})
+                                                        }).then(r => r.json());
+                                                        if (cr.success && cr.device) {
+                                                            window.__hardwareConnection = window.__hardwareConnection || {};
+                                                            window.__hardwareConnection.port = port2;
+                                                            window.__hardwareConnection.id = cr.device.id;
+                                                            setHwLogLines(prev => prev.concat('[' + new Date().toLocaleTimeString() + '] Connected to ' + port2));
+                                                        } else {
+                                                            setHwLogLines(prev => prev.concat('[' + new Date().toLocaleTimeString() + '] ERROR: Connection failed - ' + (cr.error || 'Unknown error')));
+                                                            return;
+                                                        }
                                                     }
+                                                    
+                                                    // Compile Scratch Blocks → Generate Arduino C++ → arduino-cli compile → HEX/BIN → avrdude/esptool/bossac → Board
                                                     const r = await fetch(apiBase + '/compiler/compile-upload-cpp', {
                                                         method: 'POST',
                                                         headers: {'Content-Type': 'application/json'},
                                                         body: JSON.stringify({
                                                             cppCode: hwUploadCode,
                                                             port: port2,
-                                                            board: hwUploadBoard
+                                                             board: BOARD_FQBN[hwUploadBoard?.id] || 'arduino:avr:uno'
                                                         })
                                                     });
                                                     const data = await r.json();
@@ -936,76 +1004,6 @@ const GUIComponent = props => {
                         </Box>
                     </Box>
                 </Box>
-                {hwConnWarningOpen && (
-                    <React.Fragment>
-                        <div
-                            style={{
-                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                                background: 'rgba(0,0,0,0.4)', zIndex: 9999,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}
-                            onClick={() => setHwConnWarningOpen(false)}
-                        />
-                        <div style={{
-                            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-                            background: '#fff', borderRadius: 12, padding: 28, zIndex: 10000,
-                            minWidth: 320, maxWidth: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                            fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
-                        }}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16}}>
-                                <span style={{fontSize:18, fontWeight:700, color:'#333'}}>{'Connect Your Board'}</span>
-                                <button
-                                    onClick={() => setHwConnWarningOpen(false)}
-                                    style={{background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#999', padding:'0 4px'}}
-                                >{'✕'}</button>
-                            </div>
-                            <div style={{marginBottom:20, color:'#555', fontSize:14, lineHeight:1.6}}>
-                                {'Please connect your Arduino board before uploading. Click the Connect menu in the toolbar and select Serial or Bluetooth.'}
-                            </div>
-                            <div style={{textAlign:'right'}}>
-                                <button
-                                    onClick={() => setHwConnWarningOpen(false)}
-                                    style={{
-                                        marginRight:8, background:'#f0f0f0', color:'#555', border:'1px solid #ddd', borderRadius:6,
-                                        padding:'8px 20px', fontSize:14, cursor:'pointer'
-                                    }}
-                                >{'Cancel'}</button>
-                                <button
-                                    onClick={async () => {
-                                        setHwConnWarningOpen(false);
-                                        try {
-                                            const apiBase = window.location.protocol + '//' + window.location.hostname + ':3001/api';
-                                            const dr = await fetch(apiBase + '/driver/find', { method: 'POST' }).then(r => r.json());
-                                            if (dr.found && dr.port) {
-                                                const cr = await fetch(apiBase + '/serial/connect', {
-                                                    method: 'POST',
-                                                    headers: {'Content-Type': 'application/json'},
-                                                    body: JSON.stringify({path: dr.port, baudRate: 115200, boardType: hwUploadBoard || 'arduino_uno'})
-                                                }).then(r => r.json());
-                                                if (cr.success && cr.device) {
-                                                    window.__hardwareConnection = window.__hardwareConnection || {};
-                                                    window.__hardwareConnection.port = dr.port;
-                                                    window.__hardwareConnection.id = cr.device.id;
-                                                    const ts = new Date().toLocaleTimeString();
-                                                    setHwLogLines(prev => prev.concat('[' + ts + '] Connected to ' + dr.port));
-                                                    setHwBottomTab(0);
-                                                }
-                                            } else {
-                                                alert('No Arduino board detected. Make sure it is plugged in and try again.');
-                                            }
-                                        } catch (_) {
-                                            alert('Could not detect Arduino. Make sure the backend is running on port 3001.');
-                                        }
-                                    }}
-                                    style={{
-                                        background:'#4c97ff', color:'#fff', border:'none', borderRadius:6,
-                                        padding:'8px 24px', fontSize:14, fontWeight:600, cursor:'pointer'
-                                    }}
-                                >{'OK'}</button>
-                            </div>
-                        </div>
-                    </React.Fragment>
-                )}
                 <DragLayer />
             </Box>
         );

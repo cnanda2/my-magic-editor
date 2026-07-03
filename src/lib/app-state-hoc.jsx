@@ -6,7 +6,6 @@ import ConnectedIntlProvider from './connected-intl-provider.jsx';
 import AddonHooks from '../addons/hooks';
 
 import localesReducer, {initLocale, localesInitialState} from '../reducers/locales';
-
 import {setPlayer, setFullScreen} from '../reducers/mode.js';
 
 import locales from '@turbowarp/scratch-l10n';
@@ -17,11 +16,6 @@ const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 /*
  * Higher Order Component to provide redux state. If an `intl` prop is provided
  * it will override the internal `intl` redux state
- * @param {React.Component} WrappedComponent - component to provide state for
- * @param {boolean} localesOnly - only provide the locale state, not everything
- *                      required by the GUI. Used to exclude excess state when
-                        only rendering modals, not the GUI.
- * @returns {React.Component} component with redux and intl state provided
  */
 const AppStateHOC = function (WrappedComponent, localesOnly) {
     class AppStateWrapper extends React.Component {
@@ -33,18 +27,15 @@ const AppStateHOC = function (WrappedComponent, localesOnly) {
 
             let initializedLocales = localesInitialState;
             const locale = detectLocale(Object.keys(locales));
+            
             if (locale !== 'en') {
                 initializedLocales = initLocale(initializedLocales, locale);
             }
             if (localesOnly) {
-                // Used for instantiating minimal state for the unsupported
-                // browser modal
                 reducers = {locales: localesReducer};
                 initialState = {locales: initializedLocales};
                 enhancer = composeEnhancers();
             } else {
-                // You are right, this is gross. But it's necessary to avoid
-                // importing unneeded code that will crash unsupported browsers.
                 const guiRedux = require('../reducers/gui');
                 const guiReducer = guiRedux.default;
                 const {
@@ -83,6 +74,7 @@ const AppStateHOC = function (WrappedComponent, localesOnly) {
                 enhancer = composeEnhancers(guiMiddleware);
             }
             const reducer = combineReducers(reducers);
+            
             const reducer2 = (previousState, action) => {
                 const nextState = reducer(previousState, action);
                 AddonHooks.appStateReducer(action, previousState, nextState);
@@ -95,7 +87,14 @@ const AppStateHOC = function (WrappedComponent, localesOnly) {
             );
             window.ReduxStore = this.store;
             AddonHooks.appStateStore = this.store;
-        }
+
+            // SAFEST INTERNAL EXTENSION DISPATCH
+            this.store.dispatch({
+                type: 'scratch-gui/extension-manager/ACTIVATE_EXTENSION',
+                extensionId: 'myhardware'
+            });
+        } // <-- The constructor closes perfectly right here!
+
         componentDidUpdate (prevProps) {
             if (localesOnly) return;
             if (prevProps.isPlayerOnly !== this.props.isPlayerOnly) {
@@ -105,6 +104,7 @@ const AppStateHOC = function (WrappedComponent, localesOnly) {
                 this.store.dispatch(setFullScreen(this.props.isFullScreen));
             }
         }
+
         render () {
             const {
                 isFullScreen, // eslint-disable-line no-unused-vars

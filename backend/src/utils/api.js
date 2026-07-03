@@ -5,6 +5,7 @@
 
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 
 // Configure file upload
@@ -22,6 +23,13 @@ const upload = multer({ storage });
 
 function setupAPIRoutes(app, managers) {
   const { serialManager, wsManager, deviceManager, firmwareUploader, arduinoCompiler, driverManager } = managers;
+
+  const boardFqbnMap = {
+    arduino_uno: 'arduino:avr:uno',
+    arduino_nano: 'arduino:avr:nano',
+    arduino_mega: 'arduino:avr:mega:cpu=atmega2560',
+    esp32: 'esp32:esp32:esp32'
+  };
 
   // ===== SYSTEM STATUS =====
   app.get('/api/status', (req, res) => {
@@ -46,6 +54,11 @@ function setupAPIRoutes(app, managers) {
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.get('/api/serial/current', (req, res) => {
+    const conns = serialManager.getConnections();
+    res.json({ connections: conns });
   });
 
   app.post('/api/serial/connect', async (req, res) => {
@@ -201,6 +214,50 @@ function setupAPIRoutes(app, managers) {
     }
   });
 
+  const dly = (ms) => new Promise(r => setTimeout(r, ms));
+  async function resetBoard(port) {
+    if (serialManager) {
+      await serialManager.disconnectByPort(port);
+      await dly(300);
+      await serialManager.resetToBootloader(port);
+    }
+    await dly(2500);
+  }
+
+  app.post('/api/firmware/upload-stage', async (req, res) => {
+    try {
+      const { boardType, port } = req.body;
+      const sketchDir = path.join(__dirname, '..', '..', 'firmware', 'stage_firmware');
+      const inoPath = path.join(sketchDir, 'stage_firmware.ino');
+      
+      if (!fs.existsSync(inoPath)) {
+        return res.status(404).json({ error: 'Stage firmware not found at ' + inoPath });
+      }
+      
+      const cppCode = fs.readFileSync(inoPath, 'utf8');
+      const fqbn = boardFqbnMap[boardType] || 'arduino:avr:uno';
+      const compileResult = arduinoCompiler.compile(cppCode, fqbn);
+      
+      await resetBoard(port);
+      
+      const uploadResult = arduinoCompiler.upload(compileResult.hexPath, port, fqbn);
+      let newDevice;
+      if (serialManager) {
+        try { newDevice = await serialManager.connect(port, { baudRate: 115200, boardType: boardType }); } catch (e) {}
+      }
+      
+      arduinoCompiler.cleanup(compileResult.sketchPath);
+      res.json({
+        success: true,
+        compileOutput: compileResult.output,
+        uploadOutput: uploadResult.output,
+        device: newDevice ? { id: newDevice.id, path: newDevice.path, baudRate: newDevice.baudRate, boardType: newDevice.boardType } : null
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ===== DISCOVERY =====
   app.post('/api/discovery/start', (req, res) => {
     deviceManager.startDiscovery();
@@ -263,20 +320,15 @@ function setupAPIRoutes(app, managers) {
       const fqbn = board || 'arduino:avr:uno';
       const emptyCode = 'void setup() { pinMode(13, OUTPUT); digitalWrite(13, LOW); }\nvoid loop() { }\n';
 
-      // Disconnect serial before upload
-      if (serialManager) {
-        await serialManager.disconnectByPort(port);
-      }
-
       let compileResult, uploadResult;
       try {
         compileResult = arduinoCompiler.compile(emptyCode, fqbn);
+
+        await resetBoard(port);
+
         uploadResult = arduinoCompiler.upload(compileResult.hexPath, port, fqbn);
       } finally {
-        if (serialManager) {
-          try { await serialManager.connect(port, { baudRate: 115200, boardType: fqbn }); }
-          catch (e) { arduinoCompiler.logger.warn('Reconnect failed: ' + e.message); }
-        }
+        // Do NOT reconnect — cleared code runs standalone
       }
 
       arduinoCompiler.cleanup(compileResult.sketchPath);
@@ -299,20 +351,15 @@ function setupAPIRoutes(app, managers) {
       const normPort = normalizePort(port);
       const fqbn = board || 'arduino:avr:uno';
 
-      // Disconnect serial before upload
-      if (serialManager) {
-        await serialManager.disconnectByPort(normPort);
-      }
-
       let compileResult, uploadResult;
       try {
         compileResult = arduinoCompiler.compile(cppCode, fqbn);
+
+        await resetBoard(normPort);
+
         uploadResult = arduinoCompiler.upload(compileResult.hexPath, normPort, fqbn);
       } finally {
-        if (serialManager) {
-          try { await serialManager.connect(normPort, { baudRate: 115200, boardType: fqbn }); }
-          catch (e) { arduinoCompiler.logger.warn('Reconnect failed: ' + e.message); }
-        }
+        // Do NOT reconnect — uploaded code runs standalone
       }
 
       arduinoCompiler.cleanup(compileResult.sketchPath);

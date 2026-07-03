@@ -167,7 +167,8 @@ ConnectionModal.propTypes = {
 };
 
 const mapStateToProps = state => ({
-    extensionId: state.scratchGui.connectionModal.extensionId
+    extensionId: state.scratchGui.connectionModal.extensionId,
+    connectionType: state.scratchGui.connectionModal.connectionType
 });
 
 const mapDispatchToProps = dispatch => ({

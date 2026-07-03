@@ -1,3 +1,5 @@
+// Add this import at the top
+import MyHardwareStep from './my-hardware-step.jsx';
 import PropTypes from 'prop-types';
 import React from 'react';
 import keyMirror from 'keymirror';
@@ -35,18 +37,26 @@ const ConnectionModalComponent = props => (
         onRequestClose={props.onCancel}
     >
         <Box className={styles.body}>
-            {props.phase === PHASES.scanning && !props.useAutoScan && <ScanningStep {...props} />}
-            {props.phase === PHASES.scanning && props.useAutoScan && <AutoScanningStep {...props} />}
-            {props.phase === PHASES.connecting && <ConnectingStep {...props} />}
-            {props.phase === PHASES.connected && <ConnectedStep {...props} />}
-            {props.phase === PHASES.error && <ErrorStep {...props} />}
-            {props.phase === PHASES.unavailable && <UnavailableStep {...props} />}
-            {props.phase === PHASES.updatePeripheral && <UpdatePeripheralStep {...props} />}
+            {props.extensionId === 'myhardware' && (
+                <MyHardwareStep onConnectClick={props.onConnecting} connectionType={props.connectionType} />
+            )}
+            {props.extensionId !== 'myhardware' && (
+                <>
+                    {props.phase === PHASES.scanning && !props.useAutoScan && <ScanningStep {...props} />}
+                    {props.phase === PHASES.scanning && props.useAutoScan && <AutoScanningStep {...props} />}
+                    {props.phase === PHASES.connecting && <ConnectingStep {...props} />}
+                    {props.phase === PHASES.connected && <ConnectedStep {...props} />}
+                    {props.phase === PHASES.error && <ErrorStep {...props} />}
+                    {props.phase === PHASES.unavailable && <UnavailableStep {...props} />}
+                    {props.phase === PHASES.updatePeripheral && <UpdatePeripheralStep {...props} />}
+                </>
+            )}
         </Box>
     </Modal>
 );
 
 ConnectionModalComponent.propTypes = {
+    extensionId: PropTypes.string,
     connectingMessage: PropTypes.node.isRequired,
     connectionSmallIconURL: PropTypes.string,
     connectionTipIconURL: PropTypes.string,

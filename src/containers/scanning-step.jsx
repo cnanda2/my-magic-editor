@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import bindAll from 'lodash.bindall';
 import ScanningStepComponent from '../components/connection-modal/scanning-step.jsx';
+import MyHardwareStep from '../components/connection-modal/my-hardware-step.jsx';
 import VM from 'scratch-vm';
 
 class ScanningStep extends React.Component {
@@ -18,6 +19,9 @@ class ScanningStep extends React.Component {
         };
     }
     componentDidMount () {
+        // Skip Bluetooth scanning for Web Serial extensions
+        if (this.props.extensionId === 'myhardware') return;
+
         this.props.vm.scanForPeripheral(this.props.extensionId);
         this.props.vm.on(
             'PERIPHERAL_LIST_UPDATE', this.handlePeripheralListUpdate);
@@ -25,7 +29,8 @@ class ScanningStep extends React.Component {
             'PERIPHERAL_SCAN_TIMEOUT', this.handlePeripheralScanTimeout);
     }
     componentWillUnmount () {
-        // @todo: stop the peripheral scan here
+        if (this.props.extensionId === 'myhardware') return;
+
         this.props.vm.removeListener(
             'PERIPHERAL_LIST_UPDATE', this.handlePeripheralListUpdate);
         this.props.vm.removeListener(
@@ -38,7 +43,6 @@ class ScanningStep extends React.Component {
         });
     }
     handlePeripheralListUpdate (newList) {
-        // TODO: sort peripherals by signal strength? so they don't jump around
         const peripheralArray = Object.keys(newList).map(id =>
             newList[id]
         );
@@ -52,6 +56,16 @@ class ScanningStep extends React.Component {
         });
     }
     render () {
+        // ── My Hardware: show Web Serial instructions instead of BT scanner ──
+        if (this.props.extensionId === 'myhardware') {
+            return (
+                <MyHardwareStep
+                    onConnectClick={this.props.onConnecting}
+                />
+            );
+        }
+
+        // ── All other extensions: normal Bluetooth scanning flow ──
         return (
             <ScanningStepComponent
                 connectionSmallIconURL={this.props.connectionSmallIconURL}

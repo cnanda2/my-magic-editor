@@ -37,6 +37,12 @@ const base = {
         disableHostCheck: true,
         compress: true,
         port: process.env.PORT || 8601,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:3001',
+                changeOrigin: true
+            }
+        },
         // allows ROUTING_STYLE=wildcard to work properly
         historyApiFallback: {
             rewrites: [
@@ -71,7 +77,8 @@ const base = {
             loader: 'babel-loader',
             include: [
                 path.resolve(__dirname, 'src'),
-                /node_modules[\\/]scratch-[^\\/]+[\\/]src/,
+                /node_modules[\\/]scratch-[^\\/]+[\\/]/,
+                /node_modules[\\/]@turbowarp[\\/]/,
                 /node_modules[\\/]pify/,
                 /node_modules[\\/]@vernier[\\/]godirect/
             ],
@@ -191,7 +198,7 @@ module.exports = [
                 ...htmlWebpackPluginCommon
             }),
             new HtmlWebpackPlugin({
-                chunks: ['player'],
+                chunks: ['editor'],
                 template: 'src/playground/index.ejs',
                 filename: 'index.html',
                 title: `${APP_NAME} - Run Scratch projects faster`,

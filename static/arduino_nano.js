@@ -28,70 +28,91 @@
     reset: 'reset'
   };
 
-  function showPortPicker(ports) {
-    return new Promise(function(resolve) {
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:999999;display:flex;align-items:center;justify-content:center;';
-      var dialog = document.createElement('div');
-      dialog.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:340px;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:Arial,sans-serif;';
-      dialog.innerHTML = '<h3 style="margin:0 0 6px;color:#333;font-size:18px;">Select Serial Port</h3><p style="margin:0 0 12px;color:#666;font-size:13px;">Available ports:</p>';
-      if (ports.length === 0) {
-        dialog.innerHTML += '<p style="color:#999;font-size:14px;padding:12px 0;">No ports found. Make sure your Arduino is connected.</p>';
-      } else {
-        var list = document.createElement('div');
-        list.style.cssText = 'max-height:280px;overflow-y:auto;';
-        ports.forEach(function(p) {
-          var btn = document.createElement('button');
-          btn.textContent = p.path + (p.manufacturer ? ' (' + p.manufacturer + ')' : '');
-          btn.style.cssText = 'display:block;width:100%;padding:12px 14px;margin:4px 0;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#f8f8f8;text-align:left;font-size:14px;';
-          btn.onmouseover = function(){this.style.background='#e8f4f8';this.style.borderColor='#00979D';};
-          btn.onmouseout = function(){this.style.background='#f8f8f8';this.style.borderColor='#ddd';};
-          btn.onclick = function(){overlay.remove();resolve(p.path);};
-          list.appendChild(btn);
-        });
-        dialog.appendChild(list);
+  var _localDeviceId = null;
+  var _fetchingPromise = null;
+
+  function doFetch() {
+    return fetch(API + '/serial/current').then(function(r){return r.json();}).then(function(d){
+      if (d.connections && d.connections.length > 0) {
+        _localDeviceId = d.connections[0].id;
       }
-      var cancel = document.createElement('button');
-      cancel.textContent = 'Cancel'; cancel.style.cssText = 'margin-top:14px;padding:10px 24px;border:1px solid #ccc;border-radius:6px;cursor:pointer;background:#f0f0f0;font-size:14px;display:block;width:100%;';
-      cancel.onmouseover = function(){this.style.background='#e0e0e0';};
-      cancel.onmouseout = function(){this.style.background='#f0f0f0';};
-      cancel.onclick = function(){overlay.remove();resolve(null);};
-      dialog.appendChild(cancel);
-      overlay.appendChild(dialog);
-      document.body.appendChild(overlay);
+    }).catch(function(){});
+  }
+  doFetch();
+  setInterval(doFetch, 3000);
+
+  function fetchDeviceId() {
+    if (_localDeviceId) return Promise.resolve(_localDeviceId);
+    if (_fetchingPromise) return _fetchingPromise;
+    _fetchingPromise = fetch(API + '/serial/current').then(function(r){return r.json();}).then(function(d){
+      _fetchingPromise = null;
+      if (d.connections && d.connections.length > 0) {
+        _localDeviceId = d.connections[0].id;
+        return _localDeviceId;
+      }
+      return null;
+    }).catch(function(){
+      _fetchingPromise = null;
+      return null;
+    });
+    return _fetchingPromise;
+  }
+
+  function getDeviceId(id) {
+    var hwc = window.__hardwareConnection;
+    if (hwc && hwc.id) return hwc.id;
+    if (_localDeviceId) return _localDeviceId;
+    if (id) return id;
+    return null;
+  }
+
+  function jsonFetch(path, body) {
+    return fetch(API + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); }).catch(function() { return { error: 'fetch failed' }; });
+  }
+
+  function buildCmd(op, extra) {
+    var cmd = { cmd: cmdNames[op] || op };
+    if (extra) { for (var k in extra) { if (extra.hasOwnProperty(k)) cmd[k] = extra[k]; } }
+    return cmd;
+  }
+
+  function doSend(deviceId, cmd) {
+    return jsonFetch('/serial/send/' + deviceId, cmd);
+  }
+
+  function doSendWait(deviceId, cmd, timeout) {
+    cmd._wait = true;
+    cmd._timeout = timeout || 5000;
+    return jsonFetch('/serial/send/' + deviceId, cmd).then(function(d) {
+      if (d.success && d.response && d.response.value !== undefined) return d.response.value;
+      return 0;
+    });
+  }
+
+  function sendCmd(deviceId, op, extra) {
+    var did = getDeviceId(deviceId);
+    if (did) return doSend(did, buildCmd(op, extra));
+    return fetchDeviceId().then(function(newDid) {
+      if (newDid) return doSend(newDid, buildCmd(op, extra));
+    });
+  }
+
+  function sendCmdWait(deviceId, op, extra, timeout) {
+    var did = getDeviceId(deviceId);
+    if (did) return doSendWait(did, buildCmd(op, extra), timeout);
+    return fetchDeviceId().then(function(newDid) {
+      if (newDid) return doSendWait(newDid, buildCmd(op, extra), timeout);
+      return 0;
     });
   }
 
   function analogIndex(pin) {
     if (typeof pin === 'string' && pin.toUpperCase().startsWith('A')) { return parseInt(pin.substring(1), 10); }
     return parseInt(pin, 10);
-  }
-
-  function jsonFetch(path, body) {
-    return fetch(API + path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    }).then(function(r) { return r.json(); }).catch(function() { return { error: 'fetch failed' }; });
-  }
-
-  function _did(d) { return d || (window.__hardwareConnection && window.__hardwareConnection.id) || null; }
-
-  function sendCmd(deviceId, op, extra) {
-    deviceId = _did(deviceId);
-    if (!deviceId) return;
-    var cmd = { cmd: cmdNames[op] || op };
-    if (extra) { for (var k in extra) { if (extra.hasOwnProperty(k)) cmd[k] = extra[k]; } }
-    return jsonFetch('/serial/send/' + deviceId, cmd);
-  }
-
-  function sendCmdWait(deviceId, op, extra, timeout) {
-    deviceId = _did(deviceId);
-    if (!deviceId) return Promise.resolve(0);
-    var cmd = { cmd: cmdNames[op] || op, _wait: true, _timeout: timeout || 5000 };
-    if (extra) { for (var k in extra) { if (extra.hasOwnProperty(k)) cmd[k] = extra[k]; } }
-    return jsonFetch('/serial/send/' + deviceId, cmd).then(function(d) {
-      if (d.success && d.response && d.response.value !== undefined) return d.response.value;
-      return 0;
-    });
   }
 
   class ArduinoNanoBlocks {
@@ -131,7 +152,14 @@
 
     onStart() {
       var self = this;
-      if (!self._started) { self._started = true; setTimeout(function() { self.scanAndConnect(); }, 200); }
+      self._started = true;
+      var existingId = getDeviceId(this._deviceId);
+      if (!existingId) {
+        self.scanAndConnect();
+        return false;
+      }
+      self._deviceId = existingId;
+      self._connected = true;
       return true;
     }
 
@@ -140,7 +168,7 @@
       var port = args.PORT || BOARD.defaultPort;
       function doConnect(p) {
         return jsonFetch('/serial/connect', { path: p, baudRate: args.BAUD || 115200, boardType: 'arduino_nano' }).then(function(d) {
-          if (d.success && d.device) { self._deviceId = d.device.id; self._connected = true; }
+          if (d.success && d.device) { self._deviceId = d.device.id; self._connected = true; _localDeviceId = d.device.id; }
         });
       }
       if (!port) {
@@ -153,17 +181,16 @@
     }
 
     scanAndConnect() {
-      var self = this;
-      if(self._deviceId){self.disconnect();}
-      return fetch(API + '/serial/ports').then(function(r){return r.json();}).then(function(data){
-        return showPortPicker((data&&data.ports)||[]);
-      }).then(function(path){
-        if(!path) return;
-        return jsonFetch('/serial/connect',{path:path,baudRate:115200,boardType:'arduino_nano'}).then(function(d){
-          if(d.success&&d.device){self._deviceId=d.device.id;self._connected=true;alert('Connected to '+path);}
-          else{alert('Connection failed: '+(d.error||'Unknown error'));}
-        });
-      });
+      var existingId = getDeviceId(null);
+      if (existingId) {
+        this._deviceId = existingId;
+        this._connected = true;
+        return Promise.resolve();
+      }
+      try {
+        window.top.dispatchEvent(new CustomEvent('hwShowPortPicker', {detail: {boardType: 'arduino_nano'}}));
+      } catch(e) {}
+      return Promise.resolve();
     }
 
     disconnect() {
@@ -173,18 +200,18 @@
 
     isConnected() { return this._connected; }
 
-    setPinMode(args) { sendCmd(this._deviceId, 'setPinMode', { pin: parseInt(args.PIN, 10), value: modeVal[args.MODE] !== undefined ? modeVal[args.MODE] : 1 }); }
-    digitalWrite(args) { sendCmd(this._deviceId, 'digitalWrite', { pin: parseInt(args.PIN, 10), value: binVal[args.VALUE] !== undefined ? binVal[args.VALUE] : parseInt(args.VALUE, 10) }); }
-    digitalRead(args) { return sendCmdWait(this._deviceId, 'digitalRead', { pin: parseInt(args.PIN, 10) }); }
-    analogWrite(args) { sendCmd(this._deviceId, 'analogWrite', { pin: parseInt(args.PIN, 10), value: parseInt(args.VALUE, 10) }); }
-    analogRead(args) { return sendCmdWait(this._deviceId, 'analogRead', { pin: analogIndex(args.PIN) }); }
-    setServoAngle(args) { sendCmd(this._deviceId, 'setServoAngle', { pin: parseInt(args.PIN, 10), angle: parseInt(args.ANGLE, 10) }); }
+    setPinMode(args) { sendCmd(null, 'setPinMode', { pin: parseInt(args.PIN, 10), value: modeVal[args.MODE] !== undefined ? modeVal[args.MODE] : 1 }); }
+    digitalWrite(args) { sendCmd(null, 'digitalWrite', { pin: parseInt(args.PIN, 10), value: binVal[args.VALUE] !== undefined ? binVal[args.VALUE] : parseInt(args.VALUE, 10) }); }
+    digitalRead(args) { return sendCmdWait(null, 'digitalRead', { pin: parseInt(args.PIN, 10) }); }
+    analogWrite(args) { sendCmd(null, 'analogWrite', { pin: parseInt(args.PIN, 10), value: parseInt(args.VALUE, 10) }); }
+    analogRead(args) { return sendCmdWait(null, 'analogRead', { pin: analogIndex(args.PIN) }); }
+    setServoAngle(args) { sendCmd(null, 'setServoAngle', { pin: parseInt(args.PIN, 10), angle: parseInt(args.ANGLE, 10) }); }
 
     ultrasonicDistance(args) {
       var trig = parseInt(args.TRIG, 10);
       var echo = parseInt(args.ECHO, 10);
-      sendCmd(this._deviceId, 'ultrasonicSetup', { trig: trig, echo: echo });
-      return sendCmdWait(this._deviceId, 'ultrasonicRead', { pin: trig });
+      sendCmd(null, 'ultrasonicSetup', { trig: trig, echo: echo });
+      return sendCmdWait(null, 'ultrasonicRead', { pin: trig });
     }
 
     readTemperature(args) { return 0; }

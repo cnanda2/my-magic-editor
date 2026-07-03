@@ -73,32 +73,25 @@ class ArduinoCompiler {
     fs.mkdirSync(sketchPath, { recursive: true });
     fs.writeFileSync(inoPath, cppCode, 'utf8');
 
+    const buildDir = path.join(sketchPath, 'build');
+    fs.mkdirSync(buildDir, { recursive: true });
+
     try {
-      // Compile
-      const cmd = `"${this.cliPath}" compile -b ${board} "${sketchPath}"`;
+      const cmd = `"${this.cliPath}" compile -b ${board} --output-dir "${buildDir}" "${sketchPath}"`;
       this.logger.info(`Compiling: ${cmd}`);
-      const output = execSync(cmd, { encoding: 'utf8', timeout: 60000 });
+      const output = execSync(cmd, {
+        encoding: 'utf8',
+        timeout: 60000,
+        env: {
+          ...process.env,
+          ARDUINO_DATA_DIR: path.join(process.env.LOCALAPPDATA || '', 'Arduino15'),
+          ARDUINO_SKETCHBOOK_DIR: path.join(process.env.USERPROFILE || '', 'Arduino')
+        }
+      });
       this.logger.info(`Compile output: ${output}`);
 
-      // Find the hex file - look in sketch dir and subdirs
-      let hexFile = fs.readdirSync(sketchPath).find(f => f.endsWith('.hex'));
-      if (!hexFile) {
-        // Some versions put it in a subdirectory
-        const subDirs = fs.readdirSync(sketchPath).filter(f => fs.statSync(path.join(sketchPath, f)).isDirectory());
-        for (const dir of subDirs) {
-          const dirPath = path.join(sketchPath, dir);
-          hexFile = fs.readdirSync(dirPath).find(f => f.endsWith('.hex'));
-          if (hexFile) {
-            return {
-              success: true,
-              hexPath: path.join(dirPath, hexFile),
-              sketchPath,
-              output
-            };
-          }
-        }
-        throw new Error('Compilation succeeded but no .hex file found');
-      }
+      const hexFile = fs.readdirSync(buildDir).find(f => f.endsWith('.hex'));
+      if (!hexFile) throw new Error('Compilation succeeded but no .hex file found');
 
       return {
         success: true,
@@ -107,7 +100,6 @@ class ArduinoCompiler {
         output
       };
     } catch (err) {
-      // Clean up on error
       this.cleanup(sketchPath);
       throw new Error('Compilation failed: ' + (err.stderr || err.message));
     }
@@ -123,7 +115,15 @@ class ArduinoCompiler {
     this.logger.info(`Uploading: ${cmd}`);
 
     try {
-      const output = execSync(cmd, { encoding: 'utf8', timeout: 30000 });
+      const output = execSync(cmd, {
+        encoding: 'utf8',
+        timeout: 30000,
+        env: {
+          ...process.env,
+          ARDUINO_DATA_DIR: path.join(process.env.LOCALAPPDATA || '', 'Arduino15'),
+          ARDUINO_SKETCHBOOK_DIR: path.join(process.env.USERPROFILE || '', 'Arduino')
+        }
+      });
       this.logger.info(`Upload output: ${output}`);
       return { success: true, output };
     } catch (err) {
@@ -145,26 +145,26 @@ class ArduinoCompiler {
     if (onProgress) onProgress({ step: 'compile', progress: 40, message: 'Compiling Arduino sketch...' });
     const compileResult = this.compile(cppCode, board);
 
-    // Step 3: Disconnect serial before upload (arduino-cli needs exclusive access)
+    // Step 3: Disconnect serial and reset board into bootloader via 1200 baud touch
     let reconnected = false;
     if (serialManager) {
       await serialManager.disconnectByPort(port);
+      await new Promise(r => setTimeout(r, 500));
+      await serialManager.resetToBootloader(port);
     }
+    await new Promise(r => setTimeout(r, 2000));
 
-    let uploadResult;
-    try {
-      // Step 3b: Upload
-      if (onProgress) onProgress({ step: 'upload', progress: 70, message: 'Uploading to board...' });
-      uploadResult = this.upload(compileResult.hexPath, port, board);
-    } finally {
-      // Step 3c: Always reconnect serial regardless of upload outcome
-      if (serialManager) {
-        try {
-          await serialManager.connect(port, { baudRate: 115200, boardType: board });
-          reconnected = true;
-        } catch (e) {
-          this.logger.warn(`Failed to reconnect serial after upload: ${e.message}`);
-        }
+    // Step 3b: Upload
+    if (onProgress) onProgress({ step: 'upload', progress: 70, message: 'Uploading to board...' });
+    const uploadResult = this.upload(compileResult.hexPath, port, board);
+
+    // Step 3c: Reconnect only if upload succeeded (so port is free for retry on failure)
+    if (serialManager) {
+      try {
+        await serialManager.connect(port, { baudRate: 115200, boardType: board });
+        reconnected = true;
+      } catch (e) {
+        this.logger.warn(`Failed to reconnect serial after upload: ${e.message}`);
       }
     }
 
