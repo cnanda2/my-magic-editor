@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The STEM Educator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1 { color: #00979D; font-size: 2em; margin-bottom: 10px; }
+    .subtitle { color: #94a3b8; margin-bottom: 30px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+    .card h3 { color: #00979D; margin-bottom: 12px; font-size: 1.1em; display: flex; align-items: center; gap: 8px; }
+    .card ul { list-style: none; }
+    .card ul li { padding: 4px 0; font-family: 'Courier New', monospace; font-size: 0.85em; color: #cbd5e1; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; margin-right: 4px; }
+    .badge-blue { background: #1e40af; color: #bfdbfe; }
+    .badge-green { background: #065f46; color: #a7f3d0; }
+    .badge-purple { background: #4c1d95; color: #ddd6fe; }
+    .badge-orange { background: #9a3412; color: #fed7aa; }
+    .badge-pink { background: #831843; color: #fbcfe8; }
+    .badge-red { background: #7f1d1d; color: #fecaca; }
+    .badge-teal { background: #115e59; color: #ccfbf1; }
+    .badge-yellow { background: #854d0e; color: #fef08a; }
+    .btn { display: inline-block; padding: 10px 24px; border-radius: 8px; border: none; font-size: 1em; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+    .btn-primary { background: #00979D; color: white; }
+    .btn-primary:hover { background: #007A7D; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+    .categories { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .cat-item { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; text-align: center; }
+    .cat-item .icon { font-size: 2em; margin-bottom: 8px; }
+    .cat-item .name { font-size: 0.9em; font-weight: bold; }
+    .cat-item .count { font-size: 0.75em; color: #94a3b8; }
+    .files { margin: 20px 0; }
+    .file { display: flex; align-items: center; padding: 8px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; margin: 4px 0; font-family: monospace; }
+    .file .path { flex: 1; }
+    .file .size { color: #94a3b8; margin-left: 12px; }
+    footer { text-align: center; padding: 40px 0; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Hardware Blocks</h1>
+    <p class="subtitle">TurboWarp-based Arduino &amp; ESP32 Programming Platform</p>
+
+    <div class="btn-group">
+      <a href="http://localhost:3001/api/status" target="_blank" class="btn btn-primary">Backend Status</a>
+      <a href="http://localhost:3001" target="_blank" class="btn btn-secondary">Launch Dashboard</a>
+      <a href="README.md" class="btn btn-secondary">Documentation</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>🎯 Supported Boards</h3>
+        <ul>
+          <li><span class="badge badge-blue">Uno</span> Arduino Uno (ATmega328P)</li>
+          <li><span class="badge badge-green">Nano</span> Arduino Nano (ATmega328P)</li>
+          <li><span class="badge badge-purple">Mega</span> Arduino Mega 2560</li>
+          <li><span class="badge badge-orange">ESP32</span> ESP32 (WiFi + BLE)</li>
+          <li><span class="badge badge-pink">CAM</span> ESP32-CAM (optional)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🔌 Connectivity</h3>
+        <ul>
+          <li><span class="badge badge-blue">USB</span> Web Serial API</li>
+          <li><span class="badge badge-green">WiFi</span> WebSocket for ESP32</li>
+          <li><span class="badge badge-purple">BLE</span> Bluetooth LE for ESP32</li>
+          <li><span class="badge badge-orange">Auto</span> Auto-detect + Reconnect</li>
+          <li><span class="badge badge-red">Multi</span> Multi-device support</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>📦 50+ Scratch Blocks</h3>
+        <ul>
+          <li>🔗 Connection blocks</li>
+          <li>💡 Digital / Analog I/O</li>
+          <li>🔄 PWM + Servo control</li>
+          <li>📡 Sensors (Ultrasonic, Temp/Humidity)</li>
+          <li>🖥 OLED/LCD Display</li>
+          <li>✨ NeoPixel LED strips</li>
+          <li>📬 I2C / SPI Communication</li>
+          <li>📶 ESP32 WiFi + BLE</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 style="margin-bottom: 16px;">📂 Project Structure</h2>
+    <div class="files" id="fileTree"></div>
+
+    <h2 style="margin: 30px 0 16px;">🚀 Quick Start</h2>
+    <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+      <div style="color: #22c55e;"># Start the backend server</div>
+      <div style="color: #94a3b8;">cd backend && npm start</div>
+      <div style="color: #94a3b8; margin-top: 4px;"># or</div>
+      <div style="color: #94a3b8;">node src/index.js</div>
+      <div style="color: #22c55e; margin-top: 12px;"># Load the extension in TurboWarp</div>
+      <div style="color: #94a3b8;"># Add extension from file: static/myhardware.js</div>
+      <div style="color: #22c55e; margin-top: 12px;"># Upload firmware to board</div>
+      <div style="color: #94a3b8;"># Open firmware/arduino/ScratchBridge_Arduino.ino in Arduino IDE</div>
+      <div style="color: #94a3b8;"># Upload to your board and start coding!</div>
+    </div>
+
+    <footer>
+      Hardware Blocks v1.0.0 — Open source (MIT)<br>
+      Built with TurboWarp Scratch GUI
+    </footer>
+  </div>
+
+  <script>
+    const files = [
+      { path: '📁 backend/src/index.js', desc: 'Main Express + Socket.io server' },
+      { path: '📁 backend/src/serial/SerialManager.js', desc: 'USB serial port manager' },
+      { path: '📁 backend/src/websocket/WebSocketManager.js', desc: 'ESP32 WebSocket manager' },
+      { path: '📁 backend/src/devices/DeviceManager.js', desc: 'Device registry + auto-discovery' },
+      { path: '📁 backend/src/firmware/FirmwareUploader.js', desc: 'Firmware upload (avrdude/esptool)' },
+      { path: '📁 backend/src/utils/api.js', desc: 'REST API routes' },
+      { path: '📁 frontend/src/pages/Dashboard.jsx', desc: 'Dashboard with stats & activity' },
+      { path: '📁 frontend/src/pages/Devices.jsx', desc: 'Device management + pin visualizer' },
+      { path: '📁 frontend/src/pages/BlockEditor.jsx', desc: 'Scratch block category browser' },
+      { path: '📁 frontend/src/pages/Firmware.jsx', desc: 'Firmware upload UI' },
+      { path: '📁 frontend/src/pages/Settings.jsx', desc: 'App settings' },
+      { path: '📁 frontend/src/context/SocketContext.jsx', desc: 'Socket.io React context' },
+      { path: '📁 static/myhardware.js', desc: 'TurboWarp unsandboxed extension (891 lines)' },
+      { path: '📁 firmware/arduino/ScratchBridge_Arduino.ino', desc: 'Arduino firmware' },
+      { path: '📁 firmware/esp32/ScratchBridge_ESP32.ino', desc: 'ESP32 firmware with WiFi+BLE' },
+      { path: '📁 README.md', desc: 'Project documentation' },
+      { path: '📁 docs/INSTALLATION.md', desc: 'Installation guide' },
+      { path: '📁 docs/API.md', desc: 'API documentation' },
+      { path: '📁 docs/EXTENSION.md', desc: 'Extension development guide' },
+      { path: '📁 docs/DEPLOYMENT.md', desc: 'Production deployment guide' },
+    ];
+    document.getElementById('fileTree').innerHTML = files.map(f =>
+      `<div class="file"><span class="path">${f.path}</span><span class="size">${f.desc}</span></div>`
+    ).join('');
+  </script>
+</body>
+</html>

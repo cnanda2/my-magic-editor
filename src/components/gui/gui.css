@@ -29,11 +29,12 @@
     height: 100%;
 
     /*
-        Stop scrollbar popping in and out from scratch-blocks border issue
-        https://github.com/LLK/scratch-gui/issues/318
-        TW: and also fix double horizontal scrollbar at some screen sizes in paint editor
+        Allow horizontal scroll on narrow screens while hiding vertical scroll.
+        min-width: 0 lets flex items shrink below their content size.
     */
-    overflow: hidden;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .editor-wrapper {
@@ -49,7 +50,8 @@
     */
     flex-basis: calc(1024px - 408px - (($space + $stage-standard-border-width) * 2));
     flex-grow: 1;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 280px;
     position: relative;
 
     display: flex;
@@ -252,6 +254,32 @@
     flex: 1;
 }
 
+.hw-clear-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 32px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hw-clear-btn:hover {
+    background: #f5f5f5;
+    border-color: #aaa;
+    color: #e53935;
+}
+
+.hw-clear-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 .hw-upload-code-btn {
     background: $looks-secondary;
     color: white;
@@ -269,6 +297,27 @@
 }
 
 .hw-upload-code-btn:hover {
+    opacity: 0.88;
+}
+
+.hw-firmware-btn {
+    background: #5C6BC0;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    height: 30px;
+    margin-left: 4px;
+}
+
+.hw-firmware-btn:hover {
     opacity: 0.88;
 }
 
@@ -395,6 +444,132 @@
     font-style: italic;
     font-size: 12px;
     padding-top: 4px;
+}
+
+.hw-serial-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #1a1a1a;
+    background: #fafafa;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.hw-serial-line {
+    line-height: 1.6;
+    padding: 1px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.hw-serial-placeholder-text {
+    color: #aaa;
+    font-style: italic;
+    font-size: 12px;
+}
+
+.hw-serial-controls {
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #e0e0e0;
+    background: #fff;
+    flex-shrink: 0;
+    padding: 6px 8px;
+    gap: 6px;
+}
+
+.hw-serial-baud-select {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 6px;
+    font-size: 11px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    flex-shrink: 0;
+    outline: none;
+}
+
+.hw-serial-baud-select:focus {
+    border-color: #00979D;
+}
+
+.hw-serial-input {
+    flex: 1;
+    border: 2px solid #ffd54f;
+    border-radius: 4px;
+    outline: none;
+    padding: 6px 10px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 12px;
+    color: #333;
+    background: #fffde7;
+}
+
+.hw-serial-input:focus {
+    border-color: #ffb300;
+    background: #fff8e1;
+}
+
+.hw-serial-send-btn {
+    background: #1976D2;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 30px;
+    line-height: 1;
+}
+
+.hw-serial-send-btn:hover {
+    background: #1565C0;
+}
+
+.hw-serial-send-btn:active {
+    background: #0D47A1;
+}
+
+.hw-serial-clear-btn {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 30px;
+}
+
+.hw-serial-clear-btn:hover {
+    background: #f5f5f5;
+    border-color: #bbb;
+}
+
+.hw-serial-close-btn {
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 14px;
+    color: #999;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 30px;
+    line-height: 1;
+}
+
+.hw-serial-close-btn:hover {
+    background: #fee;
+    color: #c00;
 }
 
 .python-wrapper {
@@ -553,4 +728,64 @@ $fade-out-distance: 15px;
     height: 100%;
     /* overridden by JS; this will be used if the browser can't understand that color */
     background-color: white;
+}
+
+/* ── Upload mode: responsive stage/code panel width ── */
+
+.hw-upload-active {
+    flex: 0 0 520px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* ── Responsive breakpoints ── */
+
+@media (max-width: 1200px) {
+    .hw-upload-active {
+        flex: 0 0 440px;
+    }
+}
+
+@media (max-width: 900px) {
+    .hw-upload-active {
+        flex: 0 0 360px;
+    }
+    .stage-and-target-wrapper {
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .hw-upload-active {
+        flex: 0 0 300px;
+    }
+    .hw-code-panel-header {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 44px;
+        padding: 4px 6px;
+        gap: 2px;
+    }
+    .hw-code-panel {
+        min-width: 280px;
+    }
+    .hw-code-textarea {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+    .hw-code-bottom-panel {
+        height: 100px;
+    }
+    .hw-code-bottom-tab {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+}
+
+/* Menu bar tweaks for small screens */
+@media (max-width: 768px) {
+    .menu-bar-position {
+        overflow-x: auto;
+    }
 }

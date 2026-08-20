@@ -61,6 +61,8 @@ const EXAMPLES = {
     'Fade LED': 'from board import *\n\nLED = 9\nwhile True:\n    for b in range(0, 256, 5):\n        analogWrite(LED, b)\n        delay(20)\n    for b in range(255, -1, -5):\n        analogWrite(LED, b)\n        delay(20)\n',
     'Traffic Light': 'from board import *\n\nRED, YEL, GRN = 13, 12, 11\nfor p in [RED, YEL, GRN]:\n    pinMode(p, OUTPUT)\n\nwhile True:\n    digitalWrite(RED, HIGH)\n    delay(3000)\n    digitalWrite(RED, LOW)\n    digitalWrite(GRN, HIGH)\n    delay(3000)\n    digitalWrite(GRN, LOW)\n    digitalWrite(YEL, HIGH)\n    delay(1000)\n    digitalWrite(YEL, LOW)\n',
     'Ultrasonic': 'from board import *\n\nwhile True:\n    dist = ultrasonic(7, 8)\n    print("Distance:", dist, "cm")\n    delay(500)\n',
+    'RGB LED': 'from board import *\n\n# RGB LED: R=9, G=10, B=11 (use PWM pins with 220ohm resistors)\npinMode(9, OUTPUT)\npinMode(10, OUTPUT)\npinMode(11, OUTPUT)\n\nwhile True:\n    analogWrite(9, 255)\n    analogWrite(10, 0)\n    analogWrite(11, 0)\n    delay(1000)\n    analogWrite(9, 0)\n    analogWrite(10, 255)\n    analogWrite(11, 0)\n    delay(1000)\n    analogWrite(9, 0)\n    analogWrite(10, 0)\n    analogWrite(11, 255)\n    delay(1000)\n',
+    'Mega DC Jack Blink': 'from board import *\n\n# Arduino Mega 2560 powered by DC Jack\n# External LED on pin 9 with 220ohm resistor to GND\n\npinMode(9, OUTPUT)\n\nwhile True:\n    digitalWrite(9, HIGH)\n    delay(1000)\n    digitalWrite(9, LOW)\n    delay(1000)\n',
 };
 
 const AUTOCOMPLETE = [
@@ -285,7 +287,7 @@ class PythonTab extends React.Component {
             fetch(API + '/compiler/clear-board', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ port: resolvedPort, board: 'arduino:avr:nano' })
+                body: JSON.stringify({ port: resolvedPort })
             })
             .then(r => r.json())
             .then(data => {
@@ -300,20 +302,29 @@ class PythonTab extends React.Component {
                 this.appendOutput('>>> Make sure backend server is running on port 3001\n');
             });
         };
-        if (!port || port === 'auto' || port === 'web-serial') {
-            fetch(API + '/driver/find', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.found && data.port) {
-                    doClear(data.port);
-                } else {
-                    this.appendOutput('>>> Could not detect Arduino.\n');
-                    doClear(null);
-                }
-            })
-            .catch(() => doClear(null));
+        // Disconnect Web Serial first so avrdude can access the port
+        const doClearAfterDisconnect = () => {
+            if (!port || port === 'auto' || port === 'web-serial') {
+                fetch(API + '/driver/find', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found && data.port) {
+                        doClear(data.port);
+                    } else {
+                        this.appendOutput('>>> Could not detect Arduino.\n');
+                        doClear(null);
+                    }
+                })
+                .catch(() => doClear(null));
+            } else {
+                doClear(port);
+            }
+        };
+        if (window.__hardwareConnection && window.__hardwareConnection.disconnect) {
+            this.appendOutput('>>> Disconnecting Web Serial...\n');
+            window.__hardwareConnection.disconnect().then(doClearAfterDisconnect);
         } else {
-            doClear(port);
+            doClearAfterDisconnect();
         }
     }
 
@@ -353,7 +364,7 @@ class PythonTab extends React.Component {
         const BOARD_FQBN = {
             arduino_uno: 'arduino:avr:uno',
             arduino_nano: 'arduino:avr:nano',
-            arduino_mega: 'arduino:avr:mega',
+            arduino_mega: 'arduino:avr:mega:cpu=atmega2560',
             esp32: 'esp32:esp32:esp32'
         };
         const selectedBoard = window._selectedBoard || 'arduino_uno';
@@ -383,7 +394,6 @@ class PythonTab extends React.Component {
                     this.appendOutput('>>> Step 2: Compiled successfully!\n');
                     this.appendOutput('>>> Step 3: Uploaded to Arduino!\n');
                     this.appendOutput('>>> DONE! Program is now running on your Arduino.\n');
-                    this.appendOutput('>>> (Reconnect USB to send live commands again)\n');
                 } else {
                     this.appendOutput('>>> ERROR: ' + (data.error || 'Unknown error') + '\n');
                 }
@@ -647,7 +657,7 @@ class PythonTab extends React.Component {
                     <span>UTF-8</span>
                     <span>Spaces: 4</span>
                     <span>{this.state.mode === 'live' ? 'Live Mode' : 'Upload Mode'}</span>
-                    <span style={{marginLeft:'auto'}}>Genius Mind</span>
+                    <span style={{marginLeft:'auto'}}>The STEM Educator</span>
                 </div>
             </div>
         );

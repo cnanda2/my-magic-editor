@@ -16,6 +16,8 @@ class SerialManager extends EventEmitter {
     this.connections = new Map(); // deviceId -> { port, parser, info, callbacks }
     this.autoReconnect = true;
     this.reconnectInterval = 5000;
+    this.monitorBuffers = new Map(); // deviceId -> { seq: number, lines: {seq:number, text:string}[] }
+    this.maxMonitorLines = 500;
   }
 
   /**
@@ -129,29 +131,35 @@ class SerialManager extends EventEmitter {
    * Disconnect from a device
    * Drops DTR first to trigger Arduino bootloader reset, then closes the port.
    */
-  async disconnect(deviceId) {
+  async disconnect(deviceId, skipDtr = false) {
     const conn = this.connections.get(deviceId);
     if (!conn) return;
 
     conn.info.autoReconnect = false;
 
     return new Promise((resolve) => {
-      // Drop DTR to reset the Arduino (falling edge triggers bootloader)
-      conn.port.set({ dtr: false, rts: false }, (setErr) => {
-        if (setErr) {
-          this.logger.error(`Error setting DTR: ${setErr.message}`);
-        }
-        setTimeout(() => {
-          conn.port.close((closeErr) => {
-            if (closeErr) {
-              this.logger.error(`Error closing port: ${closeErr.message}`);
-            }
-            this.connections.delete(deviceId);
-            this.logger.info(`Disconnected device: ${deviceId}`);
-            resolve();
-          });
-        }, 200);
-      });
+      const doClose = () => {
+        conn.port.close((closeErr) => {
+          if (closeErr) {
+            this.logger.error(`Error closing port: ${closeErr.message}`);
+          }
+          this.connections.delete(deviceId);
+          this.logger.info(`Disconnected device: ${deviceId}`);
+          resolve();
+        });
+      };
+
+      if (skipDtr) {
+        doClose();
+      } else {
+        // Drop DTR to reset the Arduino (falling edge triggers bootloader)
+        conn.port.set({ dtr: false, rts: false }, (setErr) => {
+          if (setErr) {
+            this.logger.error(`Error setting DTR: ${setErr.message}`);
+          }
+          setTimeout(doClose, 200);
+        });
+      }
     });
   }
 
@@ -186,16 +194,16 @@ class SerialManager extends EventEmitter {
   }
 
   /**
-   * Disconnect all devices
+   * Disconnect all devices on a given port
    */
-  async disconnectByPort(portPath) {
+  async disconnectByPort(portPath, { skipDtr = false } = {}) {
     const toDisconnect = [];
     for (const [id, conn] of this.connections) {
       if (conn.info.path === portPath) {
         toDisconnect.push(id);
       }
     }
-    await Promise.all(toDisconnect.map(id => this.disconnect(id)));
+    await Promise.all(toDisconnect.map(id => this.disconnect(id, skipDtr)));
   }
 
   async disconnectAll() {
@@ -309,6 +317,9 @@ class SerialManager extends EventEmitter {
         parsed = { raw: trimmed };
       }
 
+      // Add to monitor buffer
+      this.addMonitorLine(deviceId, trimmed);
+
       // Resolve pending response if this is a response/ack
       if (parsed.response || parsed.ack) {
         const resolve = conn.info._pendingResponse;
@@ -400,6 +411,51 @@ class SerialManager extends EventEmitter {
    */
   getConnection(deviceId) {
     return this.connections.get(deviceId);
+  }
+
+  addMonitorLine(deviceId, line) {
+    if (!this.monitorBuffers.has(deviceId)) {
+      this.monitorBuffers.set(deviceId, { seq: 0, lines: [] });
+    }
+    const buf = this.monitorBuffers.get(deviceId);
+    const entry = { seq: buf.seq, text: line };
+    buf.seq++;
+    buf.lines.push(entry);
+    if (buf.lines.length > this.maxMonitorLines) {
+      buf.lines.splice(0, buf.lines.length - this.maxMonitorLines);
+    }
+    this.emit('monitorData', { deviceId, line });
+  }
+
+  getMonitorBuffer(deviceId) {
+    const buf = this.monitorBuffers.get(deviceId);
+    return buf ? buf.lines : [];
+  }
+
+  getMonitorBufferSince(deviceId, minSeq) {
+    const buf = this.monitorBuffers.get(deviceId);
+    if (!buf) return { lines: [], nextSeq: 0 };
+    const lines = buf.lines.filter(e => e.seq >= minSeq);
+    const nextSeq = lines.length > 0 ? lines[lines.length - 1].seq + 1 : minSeq;
+    return { lines, nextSeq };
+  }
+
+  clearMonitorBuffer(deviceId) {
+    this.monitorBuffers.set(deviceId, { seq: 0, lines: [] });
+  }
+
+  writeRaw(deviceId, text) {
+    const conn = this.connections.get(deviceId);
+    if (!conn || !conn.info.connected) return false;
+    try {
+      conn.port.write(text, (err) => {
+        if (err) this.logger.error(`Serial monitor write error: ${err.message}`);
+      });
+      return true;
+    } catch (err) {
+      this.logger.error(`Serial monitor write failed: ${err.message}`);
+      return false;
+    }
   }
 }
 

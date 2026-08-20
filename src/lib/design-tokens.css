@@ -1,0 +1,96 @@
+:root {
+  /* ── Colors ─────────────────────────────────────────────── */
+  --ds-surface: #f7f9fb;
+  --ds-surface-dim: #d8dadc;
+  --ds-surface-bright: #f7f9fb;
+  --ds-surface-container-lowest: #ffffff;
+  --ds-surface-container-low: #f2f4f6;
+  --ds-surface-container: #eceef0;
+  --ds-surface-container-high: #e6e8ea;
+  --ds-surface-container-highest: #e0e3e5;
+  --ds-on-surface: #191c1e;
+  --ds-on-surface-variant: #45464d;
+  --ds-inverse-surface: #2d3133;
+  --ds-inverse-on-surface: #eff1f3;
+  --ds-outline: #76777d;
+  --ds-outline-variant: #c6c6cd;
+  --ds-surface-tint: #565e74;
+  --ds-primary: #000000;
+  --ds-on-primary: #ffffff;
+  --ds-primary-container: #131b2e;
+  --ds-on-primary-container: #7c839b;
+  --ds-inverse-primary: #bec6e0;
+  --ds-secondary: #0058be;
+  --ds-on-secondary: #ffffff;
+  --ds-secondary-container: #2170e4;
+  --ds-on-secondary-container: #fefcff;
+  --ds-tertiary: #000000;
+  --ds-on-tertiary: #ffffff;
+  --ds-tertiary-container: #0b1c30;
+  --ds-on-tertiary-container: #75859d;
+  --ds-error: #ba1a1a;
+  --ds-on-error: #ffffff;
+  --ds-error-container: #ffdad6;
+  --ds-on-error-container: #93000a;
+  --ds-primary-fixed: #dae2fd;
+  --ds-primary-fixed-dim: #bec6e0;
+  --ds-on-primary-fixed: #131b2e;
+  --ds-on-primary-fixed-variant: #3f465c;
+  --ds-secondary-fixed: #d8e2ff;
+  --ds-secondary-fixed-dim: #adc6ff;
+  --ds-on-secondary-fixed: #001a42;
+  --ds-on-secondary-fixed-variant: #004395;
+  --ds-tertiary-fixed: #d3e4fe;
+  --ds-tertiary-fixed-dim: #b7c8e1;
+  --ds-on-tertiary-fixed: #0b1c30;
+  --ds-on-tertiary-fixed-variant: #38485d;
+  --ds-background: #f7f9fb;
+  --ds-on-background: #191c1e;
+  --ds-surface-variant: #e0e3e5;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --ds-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ds-headline-lg-fontSize: 32px;
+  --ds-headline-lg-fontWeight: 700;
+  --ds-headline-lg-lineHeight: 40px;
+  --ds-headline-lg-letterSpacing: -0.02em;
+  --ds-headline-md-fontSize: 24px;
+  --ds-headline-md-fontWeight: 600;
+  --ds-headline-md-lineHeight: 32px;
+  --ds-headline-md-letterSpacing: -0.01em;
+  --ds-headline-sm-fontSize: 20px;
+  --ds-headline-sm-fontWeight: 600;
+  --ds-headline-sm-lineHeight: 28px;
+  --ds-body-lg-fontSize: 18px;
+  --ds-body-lg-fontWeight: 400;
+  --ds-body-lg-lineHeight: 28px;
+  --ds-body-md-fontSize: 16px;
+  --ds-body-md-fontWeight: 400;
+  --ds-body-md-lineHeight: 24px;
+  --ds-body-sm-fontSize: 14px;
+  --ds-body-sm-fontWeight: 400;
+  --ds-body-sm-lineHeight: 20px;
+  --ds-label-md-fontSize: 14px;
+  --ds-label-md-fontWeight: 600;
+  --ds-label-md-lineHeight: 20px;
+  --ds-label-sm-fontSize: 12px;
+  --ds-label-sm-fontWeight: 500;
+  --ds-label-sm-lineHeight: 16px;
+  --ds-label-sm-letterSpacing: 0.01em;
+
+  /* ── Border Radius ──────────────────────────────────────── */
+  --ds-rounded-sm: 2px;
+  --ds-rounded: 4px;
+  --ds-rounded-md: 6px;
+  --ds-rounded-lg: 8px;
+  --ds-rounded-xl: 12px;
+  --ds-rounded-full: 9999px;
+
+  /* ── Spacing ────────────────────────────────────────────── */
+  --ds-unit: 4px;
+  --ds-container-max: 1440px;
+  --ds-gutter: 24px;
+  --ds-margin-desktop: 40px;
+  --ds-margin-tablet: 24px;
+  --ds-margin-mobile: 16px;
+}

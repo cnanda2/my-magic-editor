@@ -18,6 +18,13 @@ const FirmwareUploader = require('./firmware/FirmwareUploader');
 const ArduinoCompiler = require('./compiler/ArduinoCompiler');
 const DriverManager = require('./driver/DriverManager');
 const { setupAPIRoutes } = require('./utils/api');
+const { setupAuthRoutes } = require('./utils/auth');
+const { setupUserRoutes } = require('./utils/userRoutes');
+const { setupTenantRoutes } = require('./utils/tenantRoutes');
+const { setupPlanRoutes } = require('./utils/planRoutes');
+const { setupContentRoutes } = require('./utils/contentRoutes');
+const { initDb } = require('./db/init');
+const { tenantResolver } = require('./utils/tenantMiddleware');
 
 // ===== LOGGER =====
 const logger = winston.createLogger({
@@ -47,6 +54,30 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+app.use(tenantResolver);
+
+// Serve editor.html with tenant branding injected
+app.get('/editor.html', async (req, res) => {
+  const fs = require('fs');
+  const editorPath = path.join(__dirname, '../../build/editor.html');
+  try {
+    let html = fs.readFileSync(editorPath, 'utf-8');
+    const tenant = req.tenant || null;
+    const tenantConfig = tenant ? {
+      appName: tenant.app_name || tenant.name,
+      companyName: tenant.company_name || '',
+      logoUrl: tenant.logo_url || '',
+      subdomain: tenant.subdomain || '',
+      customDomain: tenant.custom_domain || '',
+    } : null;
+    const script = `<script>window.__TENANT_CONFIG__ = ${JSON.stringify(tenantConfig)};</script>`;
+    html = html.replace('</head>', script + '</head>');
+    res.type('html').send(html);
+  } catch (err) {
+    res.status(500).send('Error loading editor');
+  }
+});
+
 app.use(express.static(path.join(__dirname, '../../frontend/dist')));
 app.use(express.static(path.join(__dirname, '../../build')));
 
@@ -58,7 +89,20 @@ const firmwareUploader = new FirmwareUploader(logger);
 const arduinoCompiler = new ArduinoCompiler(logger);
 const driverManager = new DriverManager(logger);
 
-// ===== API ROUTES =====
+// ===== USER MANAGEMENT (auth + admin) =====
+// NOTE: These MUST be registered before setupAPIRoutes, because setupAPIRoutes
+// ends with a catch-all `app.get('*')` SPA fallback that would otherwise
+// shadow every /api/auth and /api/admin endpoint.
+setupAuthRoutes(app);
+setupUserRoutes(app);
+setupTenantRoutes(app);
+setupPlanRoutes(app);
+setupContentRoutes(app);
+
+// Initialize the PostgreSQL schema (thestemeducator DB) on boot.
+initDb().catch((err) => logger.error(`DB init failed: ${err.message}`));
+
+// ===== API ROUTES (includes catch-all SPA fallback — keep last) =====
 setupAPIRoutes(app, { serialManager, wsManager, deviceManager, firmwareUploader, arduinoCompiler, driverManager });
 
 // ===== SOCKET.IO =====

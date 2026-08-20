@@ -1,7 +1,7 @@
 {
-  "short_name": "Genius Mind",
-  "name": "Genius Mind",
-  "description": "Arduino & ESP32 programming platform built on TurboWarp.",
+  "short_name": "The STEM Educator",
+  "name": "The STEM Educator",
+  "description": "Arduino & ESP32 programming platform.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#333333",

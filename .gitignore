@@ -26,3 +26,25 @@ npm-*
 
 # for act
 .secrets
+
+# ===== Local app additions =====
+# Logs
+*.log
+/logs
+/backend/logs
+
+# Node
+/backend/node_modules
+/frontend/node_modules
+
+# Backend runtime artifacts
+/backend/temp_sketches
+/backend/uploads
+/backend/$null
+
+# Editor configs
+.claude/
+.vscode/
+
+# Firmware build intermediates (keep the .hex outputs)
+/backend/firmware/stage_firmware/build_*/

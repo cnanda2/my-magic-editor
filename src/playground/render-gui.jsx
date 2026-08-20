@@ -5,7 +5,7 @@ const searchParams = new URLSearchParams(location.search);
 const cloudHost = searchParams.get('cloud_host') || 'wss://clouddata.turbowarp.org';
 
 const onClickLogo = () => {
-    window.open('https://thestemeducator.com/', '_blank');
+    window.open(window.location.origin, '_blank');
 };
 
 const RenderGUI = props => (

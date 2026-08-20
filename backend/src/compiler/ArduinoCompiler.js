@@ -6,6 +6,7 @@
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const PythonTranspiler = require('./PythonTranspiler');
 
 class ArduinoCompiler {
@@ -46,6 +47,27 @@ class ArduinoCompiler {
     } catch (e) { /* not in PATH */ }
     
     return null;
+  }
+
+  /**
+   * Kill stale arduino-cli and avrdude processes that may hold the port
+   */
+  killStaleProcesses() {
+    if (os.platform() === 'win32') {
+      try {
+        execSync('taskkill /F /IM arduino-cli.exe /T 2>nul', { stdio: 'pipe' });
+      } catch (_) {}
+      try {
+        execSync('taskkill /F /IM avrdude.exe /T 2>nul', { stdio: 'pipe' });
+      } catch (_) {}
+    } else {
+      try {
+        execSync('pkill -9 arduino-cli 2>/dev/null', { stdio: 'pipe' });
+      } catch (_) {}
+      try {
+        execSync('pkill -9 avrdude 2>/dev/null', { stdio: 'pipe' });
+      } catch (_) {}
+    }
   }
 
   isAvailable() {
@@ -111,6 +133,9 @@ class ArduinoCompiler {
   upload(hexPath, port, board = 'arduino:avr:uno') {
     if (!this.cliPath) throw new Error('arduino-cli not found');
 
+    // Kill any stale processes holding the port
+    this.killStaleProcesses();
+
     const cmd = `"${this.cliPath}" upload --fqbn ${board} --port ${port} --input-file "${hexPath}"`;
     this.logger.info(`Uploading: ${cmd}`);
 
@@ -145,14 +170,14 @@ class ArduinoCompiler {
     if (onProgress) onProgress({ step: 'compile', progress: 40, message: 'Compiling Arduino sketch...' });
     const compileResult = this.compile(cppCode, board);
 
-    // Step 3: Disconnect serial and reset board into bootloader via 1200 baud touch
+    // Step 3: Disconnect serial and reset board into bootloader via DTR toggle
     let reconnected = false;
     if (serialManager) {
       await serialManager.disconnectByPort(port);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 100));
       await serialManager.resetToBootloader(port);
     }
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 200));
 
     // Step 3b: Upload
     if (onProgress) onProgress({ step: 'upload', progress: 70, message: 'Uploading to board...' });

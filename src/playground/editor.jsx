@@ -15,6 +15,11 @@
  */
 
 import './import-first';
+import {fetchUser} from '../lib/auth-api';
+import {fetchBranding} from '../lib/branding';
+
+fetchUser();
+fetchBranding();
 
 import React from 'react';
 

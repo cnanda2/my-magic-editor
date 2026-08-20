@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Circuit brain icon inspired by The STEM Educator logo -->
+  <g fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Head outline - orange -->
+    <path d="M20 4 C12 4 6 10 6 18 C6 24 9 28 13 31 L13 36 L27 36 L27 31 C31 28 34 24 34 18 C34 10 28 4 20 4Z" stroke="#E87722"/>
+    <!-- Circuit traces - blue -->
+    <path d="M14 12 L14 16 L18 16" stroke="#1B75BC"/>
+    <path d="M26 12 L26 16 L22 16" stroke="#1B75BC"/>
+    <path d="M16 20 L16 24" stroke="#1B75BC"/>
+    <path d="M24 20 L24 24" stroke="#1B75BC"/>
+    <path d="M20 18 L20 26" stroke="#1B75BC"/>
+    <path d="M12 22 L16 22" stroke="#1B75BC"/>
+    <path d="M24 22 L28 22" stroke="#1B75BC"/>
+    <!-- Circuit nodes - orange dots -->
+    <circle cx="14" cy="12" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="26" cy="12" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="12" cy="22" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="28" cy="22" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="16" cy="24" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="24" cy="24" r="1.5" fill="#E87722" stroke="none"/>
+    <circle cx="20" cy="26" r="1.5" fill="#1B75BC" stroke="none"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="80" height="80" rx="12" fill="#E7352B"/>
+  <rect x="8" y="14" width="64" height="48" rx="6" fill="#1a1a2e"/>
+  <rect x="12" y="18" width="56" height="40" rx="4" fill="#0f0f1a"/>
+  <text x="40" y="28" font-family="Arial,sans-serif" font-size="7" font-weight="bold" fill="#94a3b8" text-anchor="middle">ESP32</text>
+  <rect x="18" y="30" width="44" height="20" rx="2" fill="#1a1a2e"/>
+  <text x="40" y="43" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="#60a5fa" text-anchor="middle">WiFi</text>
+  <path d="M30 47 Q40 38 50 47" stroke="#4ade80" stroke-width="1.5" fill="none"/>
+  <path d="M24 43 Q40 30 56 43" stroke="#4ade80" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <circle cx="40" cy="51" r="1.5" fill="#4ade80"/>
+  <circle cx="16" cy="18" r="2" fill="#4ade80"/>
+  <circle cx="64" cy="18" r="2" fill="#f87171"/>
+  <rect x="14" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="24" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="34" y="56" width="12" height="4" rx="1" fill="#475569"/>
+  <rect x="48" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="58" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="36" y="10" width="8" height="6" rx="2" fill="#64748b"/>
+</svg>

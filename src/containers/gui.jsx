@@ -19,6 +19,7 @@ import {
 } from '../reducers/editor-tab';
 
 import {
+    closeAuthModal,
     closeCostumeLibrary,
     closeBackdropLibrary,
     closeTelemetryModal,
@@ -149,6 +150,7 @@ const mapStateToProps = state => {
     return {
         activeTabIndex: state.scratchGui.editorTab.activeTabIndex,
         alertsVisible: state.scratchGui.alerts.visible,
+        authModalVisible: state.scratchGui.modals.authModal,
         backdropLibraryVisible: state.scratchGui.modals.backdropLibrary,
         blocksTabVisible: state.scratchGui.editorTab.activeTabIndex === BLOCKS_TAB_INDEX,
         cardsVisible: state.scratchGui.cards.visible,
@@ -186,6 +188,7 @@ const mapDispatchToProps = dispatch => ({
     onActivateTab: tab => dispatch(activateTab(tab)),
     onActivateCostumesTab: () => dispatch(activateTab(COSTUMES_TAB_INDEX)),
     onActivateSoundsTab: () => dispatch(activateTab(SOUNDS_TAB_INDEX)),
+    onRequestCloseAuthModal: () => dispatch(closeAuthModal()),
     onRequestCloseBackdropLibrary: () => dispatch(closeBackdropLibrary()),
     onRequestCloseCostumeLibrary: () => dispatch(closeCostumeLibrary()),
     onRequestCloseTelemetryModal: () => dispatch(closeTelemetryModal())

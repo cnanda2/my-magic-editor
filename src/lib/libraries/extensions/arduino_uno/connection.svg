@@ -1,0 +1,19 @@
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="200" fill="#f8fafc"/>
+  <rect x="20" y="80" width="100" height="60" rx="5" fill="#334155"/>
+  <rect x="25" y="85" width="90" height="42" rx="2" fill="#1e293b"/>
+  <rect x="40" y="127" width="60" height="8" rx="2" fill="#475569"/>
+  <rect x="30" y="90" width="18" height="6" rx="2" fill="#4ade80" opacity="0.6"/>
+  <rect x="30" y="98" width="24" height="6" rx="2" fill="#60a5fa" opacity="0.6"/>
+  <rect x="30" y="106" width="20" height="6" rx="2" fill="#fbbf24" opacity="0.6"/>
+  <rect x="155" y="85" width="90" height="60" rx="6" fill="#00979D"/>
+  <rect x="162" y="92" width="76" height="46" rx="3" fill="#0f1a24"/>
+  <rect x="168" y="98" width="64" height="34" rx="2" fill="#1a2e3f"/>
+  <rect x="180" y="108" width="40" height="14" rx="2" fill="#1a2e3f"/>
+  <text x="200" y="119" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#4ade80" text-anchor="middle">UNO</text>
+  <path d="M120 110 L155 110" stroke="#64748b" stroke-width="3" fill="none"/>
+  <circle cx="120" cy="110" r="4" fill="#475569"/>
+  <circle cx="155" cy="110" r="4" fill="#475569"/>
+  <text x="200" y="170" font-family="Arial,sans-serif" font-size="14" fill="#334155" text-anchor="middle" font-weight="bold">Arduino Uno</text>
+  <text x="200" y="185" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">Connect via USB to start coding</text>
+</svg>

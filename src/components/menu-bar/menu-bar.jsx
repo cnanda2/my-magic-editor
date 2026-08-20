@@ -35,6 +35,7 @@ import TWSaveStatus from './tw-save-status.jsx';
 import TWNews from './tw-news.jsx';
 
 import {openTipsLibrary, openSettingsModal, openRestorePointModal} from '../../reducers/modals';
+import {isLoggedIn, getUser, logout as authLogout} from '../../lib/auth-api';
 import {setPlayer} from '../../reducers/mode';
 import {
     isTimeTravel220022BC,
@@ -104,6 +105,7 @@ import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
 import prehistoricLogo from './prehistoric-logo.svg';
 import oldtimeyLogo from './oldtimey-logo.svg';
+import menuLogo from './logo/logo.png';
 
 import sharedMessages from '../../lib/shared-messages';
 
@@ -267,9 +269,14 @@ class MenuBar extends React.Component {
             'fetchAndShowPorts',
             'tryAutoConnect',
             'handleShowPortPicker',
-            'handleUploadFirmware'
+            'handleAuthChanged',
+            'handleAuthMenuToggle',
+            'handleAuthMenuClose',
+            'goToDashboard'
         ]);
         this.state = {
+            authUser: isLoggedIn() ? getUser() : null,
+            authMenuOpen: false,
             hwBoardOpen: false,
             hwConnectOpen: false,
             hwSerialOpen: false,
@@ -295,10 +302,25 @@ class MenuBar extends React.Component {
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyPress);
         window.addEventListener('hwShowPortPicker', this.handleShowPortPicker);
+        window.addEventListener('authChanged', this.handleAuthChanged);
     }
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyPress);
         window.removeEventListener('hwShowPortPicker', this.handleShowPortPicker);
+        window.removeEventListener('authChanged', this.handleAuthChanged);
+    }
+    handleAuthChanged () {
+        this.setState({authUser: isLoggedIn() ? getUser() : null, authMenuOpen: false});
+    }
+    handleAuthMenuToggle () {
+        this.setState({authMenuOpen: !this.state.authMenuOpen});
+    }
+    handleAuthMenuClose () {
+        this.setState({authMenuOpen: false});
+    }
+    goToDashboard () {
+        this.setState({authMenuOpen: false});
+        window.location.href = '/dashboard';
     }
     handleClickNew () {
         // if the project is dirty, and user owns the project, we will autosave.
@@ -461,6 +483,7 @@ class MenuBar extends React.Component {
         this.setState({hwBoardOpen: false});
     }
     handleBoardSelect (board) {
+        if (!isLoggedIn()) { window.location.href = '/login'; return; }
         var self = this;
         this.setState({hwBoardOpen: false, hwSelectedBoard: board});
         if (window.__hardwareConnection?.port || this.state.hwConnectedPort) {
@@ -523,6 +546,7 @@ class MenuBar extends React.Component {
         }).catch(function(){alert('Failed to fetch serial ports.');});
     }
     handleShowPortPicker (e) {
+        if (!isLoggedIn()) { window.location.href = '/login'; return; }
         var boardType = e.detail && e.detail.boardType;
         var board = HW_BOARDS.find(function(b) { return b.id === boardType; });
         if (!board) return;
@@ -542,6 +566,7 @@ class MenuBar extends React.Component {
         this.setState({hwConnectOpen: false});
     }
     handleSerialClick () {
+        if (!isLoggedIn()) { window.location.href = '/login'; return; }
         if (!this.state.hwSelectedBoard) {
             this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
             return;
@@ -556,6 +581,7 @@ class MenuBar extends React.Component {
         }
     }
     handleBluetoothClick () {
+        if (!isLoggedIn()) { window.location.href = '/login'; return; }
         if (!this.state.hwSelectedBoard) {
             this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
             return;
@@ -575,6 +601,7 @@ class MenuBar extends React.Component {
         }
     }
     handleWiFiClick () {
+        if (!isLoggedIn()) { window.location.href = '/login'; return; }
         if (!this.state.hwSelectedBoard) {
             this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
             return;
@@ -599,30 +626,6 @@ class MenuBar extends React.Component {
         }.bind(this)).catch(function(){
             alert('WiFi connection failed. Make sure the backend is running.');
         });
-    }
-    handleUploadFirmware () {
-        if (!this.state.hwSelectedBoard || !this.state.hwConnectedPort) {
-            this.setState({hwConnectOpen: false, hwBoardWarningOpen: true});
-            return;
-        }
-        this.setState({hwConnectOpen: false});
-        var boardObj = this.state.hwSelectedBoard;
-        var boardId = typeof boardObj === 'object' ? (boardObj.id || boardObj.file) : boardObj;
-        var portPath = window.__hardwareConnection && window.__hardwareConnection.port;
-        if (!portPath) { alert('Not connected to any port.'); return; }
-        fetch('/api/firmware/upload-stage', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({boardType: boardId, port: portPath})
-        }).then(function(r){return r.json();}).then(function(d){
-            if (d.success) {
-                if (d.device) {
-                    window.__hardwareConnection = { id: d.device.id, port: d.device.path, board: boardId, baudRate: d.device.baudRate };
-                }
-                alert('Firmware uploaded successfully!');
-            }
-            else { alert('Firmware upload failed: ' + (d.error || 'Unknown error')); }
-        }).catch(function(e){alert('Firmware upload error: '+e.message);});
     }
     handleBoardWarningClose () {
         this.setState({hwBoardWarningOpen: false});
@@ -671,9 +674,19 @@ class MenuBar extends React.Component {
         fetch('/api/serial/disconnect-all', {method: 'POST'}).catch(function(){}).then(function(){
         return fetch('/api/serial/connect', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+            },
             body: JSON.stringify({path: portPath, baudRate: 115200, boardType: boardId})
-        }).then(function(r){return r.json();}).then(function(cr){
+        }).then(function(r){
+            if (r.status === 401) {
+                window.location.href = '/login';
+                return null;
+            }
+            return r.json();
+        }).then(function(cr){
+            if (!cr) return;
             if (cr.success && cr.device) {
                 window.__hardwareConnection = window.__hardwareConnection || {};
                 window.__hardwareConnection.port = portPath;
@@ -734,10 +747,16 @@ class MenuBar extends React.Component {
         window.__hardwareConnection.port = portPath;
         fetch('/api/serial/connect', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+            },
             body: JSON.stringify({port: portPath, baudRate: 115200})
         })
-            .then(r => r.json())
+            .then(r => {
+                if (r.status === 401) { window.location.href = '/login'; return null; }
+                return r.json();
+            })
             .then(() => this.setState({
                 hwConnectedPort: portPath,
                 hwSerialOpen: false,
@@ -861,6 +880,14 @@ class MenuBar extends React.Component {
                 )}
             >
                 <div className={styles.mainMenu}>
+                    <img
+                        id="logo_img"
+                        className={styles.scratchLogo}
+                        src={this.props.logo || menuLogo}
+                        draggable={false}
+                        style={this.props.onClickLogo ? {cursor: 'pointer'} : null}
+                        onClick={this.props.onClickLogo}
+                    />
                     <div className={styles.fileGroup}>
                         {this.props.errors.length > 0 && <div>
                             <MenuLabel
@@ -1337,13 +1364,6 @@ class MenuBar extends React.Component {
                                             />
                                             {'Bluetooth'}
                                         </div>
-                                        <div
-                                            className={styles.hwConnectItem}
-                                            onClick={this.handleUploadFirmware}
-                                        >
-                                            <span style={{marginRight:8}}>{'⚡'}</span>
-                                            {'Upload Firmware'}
-                                        </div>
                                     </div>
                                 </React.Fragment>
                             )}
@@ -1538,7 +1558,7 @@ class MenuBar extends React.Component {
                                     fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
                                 }}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
-                                        <span style={{fontSize:20, fontWeight:700, color:'#333'}}>{'Geniusmid Feedback'}</span>
+                                        <span style={{fontSize:20, fontWeight:700, color:'#333'}}>{'Feedback'}</span>
                                         <button
                                             onClick={this.handleFeedbackClose}
                                             style={{background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#999', padding:'0 4px'}}
@@ -1774,16 +1794,57 @@ class MenuBar extends React.Component {
                             onClick={this.handleFeedbackOpen}
                             style={{
                                 background: 'none', border: '1px solid #ddd', borderRadius: 6,
-                                padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#555',
+                                padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#fff',
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            {'Geniusmid Feedback'}
+                            {'Feedback'}
                         </button>
                     </div>
                 </div>
 
                 <div className={styles.accountInfoGroup}>
+                    <div className={classNames(styles.menuBarItem, styles.hoverable, styles.hwBoardMenu)}>
+                        <button
+                            className={styles.feedbackButton}
+                            onClick={() => {
+                                if (this.state.authUser) {
+                                    this.handleAuthMenuToggle();
+                                } else {
+                                    window.location.href = '/login';
+                                }
+                            }}
+                            style={{
+                                background: 'none', border: '1px solid #ddd', borderRadius: 6,
+                                padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#fff',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {this.state.authUser ? this.state.authUser.username : 'Sign In'}
+                        </button>
+                        {this.state.authUser && this.state.authMenuOpen && (
+                            <React.Fragment>
+                                <div className={styles.hwModalBackdrop} onClick={this.handleAuthMenuClose} />
+                                <div className={styles.hwConnectDropdown} style={{right: 0, left: 'auto'}}>
+                                    <div
+                                        className={styles.hwConnectItem}
+                                        onClick={this.goToDashboard}
+                                    >
+                                        {'Dashboard'}
+                                    </div>
+                                    <div
+                                        className={styles.hwConnectItem}
+                                        onClick={() => {
+                                            authLogout();
+                                            this.setState({authUser: null, authMenuOpen: false});
+                                        }}
+                                    >
+                                        {'Logout'}
+                                    </div>
+                                </div>
+                            </React.Fragment>
+                        )}
+                    </div>
                     <TWSaveStatus
                         showSaveFilePicker={this.props.showSaveFilePicker}
                     />

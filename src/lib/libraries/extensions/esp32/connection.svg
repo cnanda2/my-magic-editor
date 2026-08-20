@@ -1,0 +1,21 @@
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="200" fill="#f8fafc"/>
+  <rect x="20" y="80" width="100" height="60" rx="5" fill="#334155"/>
+  <rect x="25" y="85" width="90" height="42" rx="2" fill="#1e293b"/>
+  <rect x="40" y="127" width="60" height="8" rx="2" fill="#475569"/>
+  <rect x="30" y="90" width="18" height="6" rx="2" fill="#4ade80" opacity="0.6"/>
+  <rect x="30" y="98" width="24" height="6" rx="2" fill="#60a5fa" opacity="0.6"/>
+  <rect x="155" y="85" width="90" height="55" rx="6" fill="#E7352B"/>
+  <rect x="162" y="92" width="76" height="41" rx="3" fill="#1a1a2e"/>
+  <rect x="168" y="98" width="64" height="29" rx="2" fill="#0f0f1a"/>
+  <rect x="182" y="104" width="36" height="16" rx="2" fill="#1a1a2e"/>
+  <text x="200" y="115" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#60a5fa" text-anchor="middle">ESP32</text>
+  <path d="M190 120 Q200 115 210 120" stroke="#4ade80" stroke-width="1" fill="none"/>
+  <circle cx="200" cy="123" r="1" fill="#4ade80"/>
+  <text x="200" y="105" font-family="Arial,sans-serif" font-size="5" fill="#94a3b8" text-anchor="middle">WiFi &amp; BLE</text>
+  <path d="M120 110 L155 110" stroke="#64748b" stroke-width="3" fill="none"/>
+  <circle cx="120" cy="110" r="4" fill="#475569"/>
+  <circle cx="155" cy="110" r="4" fill="#475569"/>
+  <text x="200" y="170" font-family="Arial,sans-serif" font-size="14" fill="#334155" text-anchor="middle" font-weight="bold">ESP32</text>
+  <text x="200" y="185" font-family="Arial,sans-serif" font-size="10" fill="#64748b" text-anchor="middle">Connect via WiFi/WebSocket to start coding</text>
+</svg>

@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-primary: #00979D;
+  --brand-secondary: #4c97ff;
+
+  /* ── Design tokens ──────────────────────────────────────── */
+  --ds-surface: #f7f9fb;
+  --ds-surface-dim: #d8dadc;
+  --ds-surface-bright: #f7f9fb;
+  --ds-surface-container-lowest: #ffffff;
+  --ds-surface-container-low: #f2f4f6;
+  --ds-surface-container: #eceef0;
+  --ds-surface-container-high: #e6e8ea;
+  --ds-surface-container-highest: #e0e3e5;
+  --ds-on-surface: #191c1e;
+  --ds-on-surface-variant: #45464d;
+  --ds-inverse-surface: #2d3133;
+  --ds-inverse-on-surface: #eff1f3;
+  --ds-outline: #76777d;
+  --ds-outline-variant: #c6c6cd;
+  --ds-surface-tint: #565e74;
+  --ds-primary: #000000;
+  --ds-on-primary: #ffffff;
+  --ds-primary-container: #131b2e;
+  --ds-on-primary-container: #7c839b;
+  --ds-inverse-primary: #bec6e0;
+  --ds-secondary: #0058be;
+  --ds-on-secondary: #ffffff;
+  --ds-secondary-container: #2170e4;
+  --ds-on-secondary-container: #fefcff;
+  --ds-tertiary: #000000;
+  --ds-on-tertiary: #ffffff;
+  --ds-tertiary-container: #0b1c30;
+  --ds-on-tertiary-container: #75859d;
+  --ds-error: #ba1a1a;
+  --ds-on-error: #ffffff;
+  --ds-error-container: #ffdad6;
+  --ds-on-error-container: #93000a;
+  --ds-background: #f7f9fb;
+  --ds-on-background: #191c1e;
+  --ds-surface-variant: #e0e3e5;
+  --ds-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ds-rounded-sm: 2px;
+  --ds-rounded: 4px;
+  --ds-rounded-md: 6px;
+  --ds-rounded-lg: 8px;
+  --ds-rounded-xl: 12px;
+  --ds-rounded-full: 9999px;
+  --ds-unit: 4px;
+  --ds-container-max: 1440px;
+  --ds-gutter: 24px;
+  --ds-margin-desktop: 40px;
+  --ds-margin-tablet: 24px;
+  --ds-margin-mobile: 16px;
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 #0f172a;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #0f172a;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #334155;
+    border-radius: 3px;
+  }
+
+  .dark * {
+    scrollbar-color: #475569 #1e293b;
+  }
+
+  .dark *::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: #475569;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-slate-700 bg-slate-800 p-4 shadow-md;
+  }
+}
+
+/* ===== The STEM Educator design helpers ===== */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+.ambient-shadow {
+  box-shadow: 0 4px 20px -2px rgba(16, 35, 72, 0.12);
+}
+
+/* Override: strip left/right padding from the design-system margin-desktop
+   utility — scoped to the dashboard only. */
+.dashboard .px-margin-desktop,
+main.px-0 {
+  padding-left: 0px;
+  padding-right: 0px;
+}

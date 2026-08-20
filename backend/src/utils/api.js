@@ -7,6 +7,9 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { authRequired } = require('./auth');
+const { writeAudit } = require('../db/init');
+const clientIp = (req) => (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim();
 
 // Configure file upload
 const storage = multer.diskStorage({
@@ -61,7 +64,7 @@ function setupAPIRoutes(app, managers) {
     res.json({ connections: conns });
   });
 
-  app.post('/api/serial/connect', async (req, res) => {
+  app.post('/api/serial/connect', authRequired, async (req, res) => {
     try {
       const { path, baudRate, boardType } = req.body;
       const device = await serialManager.connect(path, { baudRate, boardType });
@@ -71,7 +74,7 @@ function setupAPIRoutes(app, managers) {
     }
   });
 
-  app.post('/api/serial/auto-connect', async (req, res) => {
+  app.post('/api/serial/auto-connect', authRequired, async (req, res) => {
     try {
       const knownVids = ['1A86', '2341', '239A', '10C4', '0403', '2E8A', '303A'];
       const ports = await serialManager.listPorts();
@@ -199,7 +202,7 @@ function setupAPIRoutes(app, managers) {
     res.json({ tools });
   });
 
-  app.post('/api/firmware/upload', upload.single('firmware'), async (req, res) => {
+  app.post('/api/firmware/upload', authRequired, upload.single('firmware'), async (req, res) => {
     try {
       const { boardType, port } = req.body;
       const firmwarePath = req.file.path;
@@ -224,9 +227,10 @@ function setupAPIRoutes(app, managers) {
     await dly(2500);
   }
 
-  app.post('/api/firmware/upload-stage', async (req, res) => {
+  app.post('/api/firmware/upload-stage', authRequired, async (req, res) => {
     try {
       const { boardType, port } = req.body;
+      writeAudit({ userId: req.auth?.sub, actionType: 'FIRMWARE_UPLOAD_STAGE', details: `board=${boardType} port=${port}`, ip: clientIp(req) });
       const sketchDir = path.join(__dirname, '..', '..', 'firmware', 'stage_firmware');
       const inoPath = path.join(sketchDir, 'stage_firmware.ino');
       
@@ -290,7 +294,7 @@ function setupAPIRoutes(app, managers) {
 
   const normalizePort = (p) => (p || '').toUpperCase().replace(/^COM(\d+)$/, 'COM$1');
 
-  app.post('/api/compiler/compile-upload', async (req, res) => {
+  app.post('/api/compiler/compile-upload', authRequired, async (req, res) => {
     try {
       if (!arduinoCompiler || !arduinoCompiler.isAvailable()) {
         return res.status(500).json({ error: 'arduino-cli not available. Install it in tools/arduino-cli/' });
@@ -299,6 +303,7 @@ function setupAPIRoutes(app, managers) {
       if (!code) return res.status(400).json({ error: 'No code provided' });
       if (!port) return res.status(400).json({ error: 'No port specified' });
       port = normalizePort(port);
+      writeAudit({ userId: req.auth?.sub, actionType: 'COMPILE_UPLOAD', details: `port=${port} board=${board}`, ip: clientIp(req) });
 
       const fqbn = board || 'arduino:avr:uno';
       const result = await arduinoCompiler.compileAndUpload(code, port, fqbn, null, serialManager);
@@ -375,6 +380,15 @@ function setupAPIRoutes(app, managers) {
     }
     const boards = arduinoCompiler.listBoards();
     res.json({ boards });
+  });
+
+  // ===== WHITE-LABEL CONFIG =====
+  app.get('/api/config', (req, res) => {
+    res.json({
+      appName: process.env.APP_NAME || 'The STEM Educator',
+      companyName: process.env.COMPANY_NAME || '',
+      instanceId: process.env.INSTANCE_ID || 'default'
+    });
   });
 
   // Send feedback to dev console

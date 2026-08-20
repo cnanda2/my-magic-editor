@@ -1,0 +1,17 @@
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="80" height="80" rx="12" fill="#00979D"/>
+  <rect x="8" y="14" width="64" height="48" rx="6" fill="#1a2e3f"/>
+  <rect x="12" y="18" width="56" height="40" rx="4" fill="#0f1a24"/>
+  <text x="40" y="28" font-family="Arial,sans-serif" font-size="7" font-weight="bold" fill="#94a3b8" text-anchor="middle">ARDUINO</text>
+  <rect x="24" y="30" width="32" height="20" rx="2" fill="#1a2e3f"/>
+  <text x="40" y="43" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#4ade80" text-anchor="middle">UNO</text>
+  <circle cx="16" cy="18" r="2" fill="#4ade80"/>
+  <circle cx="64" cy="18" r="2" fill="#f87171"/>
+  <rect x="14" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="22" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="30" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="42" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="50" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="58" y="56" width="8" height="4" rx="1" fill="#475569"/>
+  <rect x="34" y="10" width="12" height="6" rx="2" fill="#64748b"/>
+</svg>
