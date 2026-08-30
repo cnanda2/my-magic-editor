@@ -182,18 +182,24 @@ async function initDb() {
   // ---- billing plans ----------------------------------------------------
   await query(`
     CREATE TABLE IF NOT EXISTS billing_plans (
-      id            VARCHAR(64) PRIMARY KEY,
-      name          VARCHAR(128) NOT NULL,
-      price         INTEGER,
-      description   TEXT,
-      features      JSONB DEFAULT '[]'::jsonb,
-      popular       BOOLEAN DEFAULT false,
-      active        BOOLEAN DEFAULT true,
-      sort_order    INTEGER DEFAULT 0,
-      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id                  VARCHAR(64) PRIMARY KEY,
+      name                VARCHAR(128) NOT NULL,
+      price               INTEGER,
+      description         TEXT,
+      features            JSONB DEFAULT '[]'::jsonb,
+      popular             BOOLEAN DEFAULT false,
+      active              BOOLEAN DEFAULT true,
+      sort_order          INTEGER DEFAULT 0,
+      stripe_price_id     VARCHAR(255),
+      stripe_price_id_yearly VARCHAR(255),
+      feature_flags       JSONB DEFAULT '{}'::jsonb,
+      created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  try { await query(`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255);`); } catch (e) {}
+  try { await query(`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS stripe_price_id_yearly VARCHAR(255);`); } catch (e) {}
+  try { await query(`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS feature_flags JSONB DEFAULT '{}'::jsonb;`); } catch (e) {}
 
   // ---- page content for public pages (pricing, about, etc.) ------------
   await query(`

@@ -1,8 +1,13 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrandProvider } from './context/BrandContext';
 import ProtectedRoute from './components/ProtectedRoute';
+
+function WhiteLabelRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/white-label${location.search}`} replace />;
+}
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -19,8 +24,11 @@ import BlockEditor from './pages/BlockEditor';
 import Firmware from './pages/Firmware';
 import Settings from './pages/Settings';
 import DesignSettings from './pages/DesignSettings';
+import WhiteLabelOnboarding from './pages/WhiteLabelOnboarding';
+import Documentation from './pages/Documentation';
 import Billing from './pages/Billing';
 import Pricing from './pages/Pricing';
+import PartnerSignup from './pages/PartnerSignup';
 
 // Admin-only guard: redirects non-admins away from management pages.
 function AdminRoute({ children }) {
@@ -35,6 +43,13 @@ function SuperAdminRoute({ children }) {
   return children;
 }
 
+function BrandingRoute({ children }) {
+  const { user } = useAuth();
+  // Allow both Super Admin and Tenant Admin to manage white-label branding (like thestemeducator.com)
+  if (!user || !['Super Admin', 'Tenant Admin'].includes(user.role)) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -46,8 +61,9 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/partner-signup" element={<PartnerSignup />} />
           <Route
-            element={<ProtectedRoute><SuperAdminRoute><Pricing /></SuperAdminRoute></ProtectedRoute>}
+            element={<ProtectedRoute><BrandingRoute><Pricing /></BrandingRoute></ProtectedRoute>}
             path="/pricing"
           />
 
@@ -81,12 +97,24 @@ function App() {
             path="/tenants/:id"
           />
           <Route
-            element={<ProtectedRoute><SuperAdminRoute><DesignSettings /></SuperAdminRoute></ProtectedRoute>}
+            element={<ProtectedRoute><BrandingRoute><WhiteLabelRedirect /></BrandingRoute></ProtectedRoute>}
             path="/design"
           />
           <Route
-            element={<ProtectedRoute><SuperAdminRoute><Billing /></SuperAdminRoute></ProtectedRoute>}
+            element={<ProtectedRoute><BrandingRoute><WhiteLabelOnboarding /></BrandingRoute></ProtectedRoute>}
+            path="/white-label"
+          />
+          <Route
+            element={<ProtectedRoute><BrandingRoute><Billing /></BrandingRoute></ProtectedRoute>}
             path="/billing"
+          />
+          <Route
+            element={<ProtectedRoute><SuperAdminRoute><Documentation /></SuperAdminRoute></ProtectedRoute>}
+            path="/docs/:id"
+          />
+          <Route
+            element={<ProtectedRoute><SuperAdminRoute><Documentation /></SuperAdminRoute></ProtectedRoute>}
+            path="/docs"
           />
 
           {/* Admin settings */}

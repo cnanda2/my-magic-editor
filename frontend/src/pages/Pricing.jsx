@@ -26,6 +26,8 @@ function FeaturesList({ features, popular }) {
 
 function PricingCard({ plan, yearly, currency }) {
   const ref = useRef(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -39,6 +41,20 @@ function PricingCard({ plan, yearly, currency }) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  const handleSubscribe = async () => {
+    if (plan.price === 0) return; // free plan — nothing to do
+    if (plan.price === null) { window.location.href = 'mailto:sales@example.com'; return; }
+    setCheckoutLoading(true);
+    try {
+      const { data } = await api.post('/billing/checkout', { plan_id: plan.id, yearly });
+      window.location.href = data.url;
+    } catch (e) {
+      const msg = e.response?.data?.error || 'Could not start checkout';
+      toast.error(msg);
+    }
+    setCheckoutLoading(false);
+  };
 
   const price = plan.price === null || plan.price === undefined ? null : Number(plan.price);
 
@@ -71,10 +87,22 @@ function PricingCard({ plan, yearly, currency }) {
         </div>
       </div>
       <FeaturesList features={plan.features} popular={plan.popular} />
-      <div className="p-3 bg-surface-container rounded-lg text-center text-body-sm text-on-surface-variant border border-outline-variant/20">
-        <span className="material-symbols-outlined text-[16px] align-text-bottom text-indigo-accent">visibility</span>{' '}
-        {price === 0 ? 'Free tier' : price === null ? 'Contact sales' : 'Billed monthly, cancel anytime'}
-      </div>
+      <button
+        onClick={handleSubscribe}
+        disabled={checkoutLoading || price === 0}
+        className={`w-full py-3 rounded-lg text-label-md font-medium transition-all ${
+          price === 0
+            ? 'bg-surface-container text-on-surface-variant cursor-default'
+            : plan.popular
+            ? 'bg-stem-orange text-pure-white hover:brightness-90 disabled:opacity-50'
+            : 'bg-deep-navy text-pure-white hover:opacity-90 disabled:opacity-50'
+        }`}
+      >
+        {checkoutLoading ? 'Redirecting...' :
+          price === 0 ? 'Current Free Plan' :
+          price === null ? 'Contact Sales' :
+          `Get ${plan.name}`}
+      </button>
     </div>
   );
 }
