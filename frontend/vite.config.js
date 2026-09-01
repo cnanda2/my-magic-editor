@@ -2,8 +2,25 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// Redirect root to the Scratch editor served by the backend
+function redirectRootPlugin() {
+  return {
+    name: 'redirect-root-to-editor',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/' || req.url === '') {
+          res.writeHead(302, { Location: '/editor.html' });
+          res.end();
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), redirectRootPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -42,6 +59,14 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/manifest.webmanifest': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/docs': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
