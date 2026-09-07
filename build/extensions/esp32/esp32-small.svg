@@ -1,0 +1,10 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="6" fill="#E7352B"/>
+  <rect x="5" y="8" width="30" height="22" rx="3" fill="#0f0f1a"/>
+  <text x="20" y="14" font-family="Arial,sans-serif" font-size="4" font-weight="bold" fill="#94a3b8" text-anchor="middle">ESP32</text>
+  <rect x="10" y="16" width="20" height="12" rx="1" fill="#1a1a2e"/>
+  <text x="20" y="24" font-family="Arial,sans-serif" font-size="7" font-weight="bold" fill="#60a5fa" text-anchor="middle">WiFi</text>
+  <circle cx="8" cy="9" r="1.5" fill="#4ade80"/>
+  <circle cx="32" cy="9" r="1.5" fill="#f87171"/>
+  <rect x="7" y="28" width="26" height="2" rx="1" fill="#475569"/>
+</svg>
