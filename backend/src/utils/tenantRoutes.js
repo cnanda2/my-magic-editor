@@ -287,7 +287,7 @@ function setupTenantRoutes(app) {
     }
   });
 
-  // ===== Update tenant branding - Super Admin only (white-labeling is not self-service) =====
+  // ===== Update tenant branding - Super Admin only (colors/domain/app name stay exclusive; logo/favicon are separate self-service endpoints below) =====
   app.patch('/api/tenant/settings', authRequired, async (req, res) => {
     if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
@@ -394,8 +394,8 @@ function setupTenantRoutes(app) {
   });
 
   // ===== TENANT: Upload logo =====
+  // Self-service: any tenant admin can upload their own tenant's logo (scoped to req.auth.tenant_id below)
   app.post('/api/tenant/logo', authRequired, async (req, res) => {
-    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const multer = require('multer');
       const fs = require('fs');
@@ -437,8 +437,8 @@ function setupTenantRoutes(app) {
   });
 
   // ===== TENANT: Upload favicon =====
+  // Self-service: any tenant admin can upload their own tenant's favicon (scoped to req.auth.tenant_id below)
   app.post('/api/tenant/favicon', authRequired, async (req, res) => {
-    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const multer = require('multer');
       const fs = require('fs');
