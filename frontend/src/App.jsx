@@ -45,7 +45,7 @@ function SuperAdminRoute({ children }) {
 
 function BrandingRoute({ children }) {
   const { user } = useAuth();
-  // Allow both Super Admin and Tenant Admin to manage white-label branding
+  // Pricing/Billing only - white-labeling itself is Super Admin-exclusive (see SuperAdminRoute)
   if (!user || !['Super Admin', 'Tenant Admin'].includes(user.role)) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -89,19 +89,19 @@ function App() {
             path="/audit"
           />
           <Route
-            element={<ProtectedRoute><AdminRoute><Tenants /></AdminRoute></ProtectedRoute>}
+            element={<ProtectedRoute><SuperAdminRoute><Tenants /></SuperAdminRoute></ProtectedRoute>}
             path="/tenants"
           />
           <Route
-            element={<ProtectedRoute><AdminRoute><TenantDetail /></AdminRoute></ProtectedRoute>}
+            element={<ProtectedRoute><SuperAdminRoute><TenantDetail /></SuperAdminRoute></ProtectedRoute>}
             path="/tenants/:id"
           />
           <Route
-            element={<ProtectedRoute><BrandingRoute><WhiteLabelRedirect /></BrandingRoute></ProtectedRoute>}
+            element={<ProtectedRoute><SuperAdminRoute><WhiteLabelRedirect /></SuperAdminRoute></ProtectedRoute>}
             path="/design"
           />
           <Route
-            element={<ProtectedRoute><BrandingRoute><WhiteLabelOnboarding /></BrandingRoute></ProtectedRoute>}
+            element={<ProtectedRoute><SuperAdminRoute><WhiteLabelOnboarding /></SuperAdminRoute></ProtectedRoute>}
             path="/white-label"
           />
           <Route

@@ -40,9 +40,6 @@ export default function AdminLayout({ children, mainClassName = '' }) {
       { to: '/pricing', icon: 'sell', label: 'Pricing Plans' },
       { to: '/billing', icon: 'payments', label: 'Revenue' },
     ] : []),
-    ...(isTenantAdmin ? [
-      { to: '/white-label', icon: 'palette', label: 'White-Label' },
-    ] : []),
     { to: `/editor.html?tenant_id=${user?.tenant_id || ''}`, icon: 'code', label: 'Block Editor', external: true },
     { to: '/settings', icon: 'settings', label: 'Settings' },
   ];
@@ -59,9 +56,6 @@ export default function AdminLayout({ children, mainClassName = '' }) {
       { to: '/pricing', label: 'Pricing' },
       { to: '/white-label', label: 'White-Label' },
       { to: '/billing', label: 'Billing' },
-    ] : []),
-    ...(isTenantAdmin ? [
-      { to: '/white-label', label: 'White-Label' },
     ] : []),
     { to: `/editor.html?tenant_id=${user?.tenant_id || ''}`, label: 'Editor', external: true },
   ];

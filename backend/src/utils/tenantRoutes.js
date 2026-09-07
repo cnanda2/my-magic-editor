@@ -287,8 +287,9 @@ function setupTenantRoutes(app) {
     }
   });
 
-  // ===== TENANT ADMIN: Update own tenant branding =====
+  // ===== Update tenant branding - Super Admin only (white-labeling is not self-service) =====
   app.patch('/api/tenant/settings', authRequired, async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const allowed = ['name', 'company_name', 'app_name', 'logo_url', 'favicon_url', 'primary_color', 'secondary_color'];
       const allowedJsonb = ['config'];
@@ -394,6 +395,7 @@ function setupTenantRoutes(app) {
 
   // ===== TENANT: Upload logo =====
   app.post('/api/tenant/logo', authRequired, async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const multer = require('multer');
       const fs = require('fs');
@@ -436,6 +438,7 @@ function setupTenantRoutes(app) {
 
   // ===== TENANT: Upload favicon =====
   app.post('/api/tenant/favicon', authRequired, async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const multer = require('multer');
       const fs = require('fs');
@@ -522,6 +525,7 @@ function setupTenantRoutes(app) {
   // Body: { customDomain?, subdomain?, appName?, primaryColor?, secondaryColor?, logoUrl? }
   // Does everything in one call: validates domain, updates tenant, syncs branding — self-serve white-label setup
   app.post('/api/tenant/white-label/setup', authRequired, async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const { customDomain, subdomain, appName, primaryColor, secondaryColor, logoUrl, faviconUrl } = req.body || {};
       const tenantId = req.auth.tenant_id;
