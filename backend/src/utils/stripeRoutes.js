@@ -61,8 +61,9 @@ async function upsertSubscription(tenantId, data) {
 
 function setupStripeRoutes(app, expressRaw) {
   if (!STRIPE_SECRET_KEY) {
-    console.warn('[stripe] STRIPE_SECRET_KEY not set — billing routes disabled');
-    return;
+    // Routes still get registered below (so GET /api/billing/subscription and clear
+    // 503s work), but paid checkout/portal cannot function without a real key.
+    console.warn('[stripe] STRIPE_SECRET_KEY not set — checkout/portal will return 503 until it is configured');
   }
 
   // Webhook needs raw body — must be registered before express.json() on this path
@@ -172,6 +173,9 @@ function setupStripeRoutes(app, expressRaw) {
 
   // Create Checkout Session
   app.post('/api/billing/checkout', authRequired, async (req, res) => {
+    if (!STRIPE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Billing is not configured on this server yet. An administrator must set STRIPE_SECRET_KEY in backend\\.env.' });
+    }
     try {
       const stripe = getStripe();
       const { plan_id, yearly = false } = req.body || {};
@@ -212,6 +216,9 @@ function setupStripeRoutes(app, expressRaw) {
 
   // Create Customer Portal Session
   app.post('/api/billing/portal', authRequired, async (req, res) => {
+    if (!STRIPE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Billing is not configured on this server yet. An administrator must set STRIPE_SECRET_KEY in backend\\.env.' });
+    }
     try {
       const stripe = getStripe();
       const tenantId = req.auth.tenant_id;

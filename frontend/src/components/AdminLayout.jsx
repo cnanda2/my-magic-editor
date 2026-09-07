@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import WhiteLabelHelpBot from './WhiteLabelHelpBot';
+import superAdminLogo from '../assets/logo/logo.png';
 
 function initials(user) {
   const src = user?.full_name || user?.username || user?.email || '';
@@ -12,10 +14,15 @@ export default function AdminLayout({ children, mainClassName = '' }) {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const isSuperAdmin = user?.role === 'Super Admin';
+  const isTenantAdmin = user?.role === 'Tenant Admin';
+  const canBrand = isSuperAdmin || isTenantAdmin;
   const [tenantInfo, setTenantInfo] = useState(null);
 
   useEffect(() => {
-    if (user && !isSuperAdmin) {
+    // Fetch for Super Admin too - their tenant_id points at the platform's own
+    // instance tenant row, so this is how they get a configurable logo/branding
+    // instead of the hardcoded default.
+    if (user) {
       api.get('/tenant/settings').then(r => setTenantInfo(r.data.tenant)).catch(() => {});
     }
   }, [user, isSuperAdmin]);
@@ -29,11 +36,14 @@ export default function AdminLayout({ children, mainClassName = '' }) {
     ] : []),
     ...(isSuperAdmin ? [
       { to: '/tenants', icon: 'domain', label: 'Tenants' },
+      { to: '/white-label', icon: 'palette', label: 'White-Label' },
       { to: '/pricing', icon: 'sell', label: 'Pricing Plans' },
-      { to: '/design', icon: 'palette', label: 'White-Labeling' },
       { to: '/billing', icon: 'payments', label: 'Revenue' },
     ] : []),
-    { to: '/editor.html', icon: 'code', label: 'Block Editor', external: true },
+    ...(isTenantAdmin ? [
+      { to: '/white-label', icon: 'palette', label: 'White-Label' },
+    ] : []),
+    { to: `/editor.html?tenant_id=${user?.tenant_id || ''}`, icon: 'code', label: 'Block Editor', external: true },
     { to: '/settings', icon: 'settings', label: 'Settings' },
   ];
 
@@ -47,10 +57,13 @@ export default function AdminLayout({ children, mainClassName = '' }) {
     ...(isSuperAdmin ? [
       { to: '/tenants', label: 'Institutions' },
       { to: '/pricing', label: 'Pricing' },
-      { to: '/design', label: 'Branding' },
+      { to: '/white-label', label: 'White-Label' },
       { to: '/billing', label: 'Billing' },
     ] : []),
-    { to: '/editor.html', label: 'Editor', external: true },
+    ...(isTenantAdmin ? [
+      { to: '/white-label', label: 'White-Label' },
+    ] : []),
+    { to: `/editor.html?tenant_id=${user?.tenant_id || ''}`, label: 'Editor', external: true },
   ];
 
   return (
@@ -59,9 +72,15 @@ export default function AdminLayout({ children, mainClassName = '' }) {
         <div className="flex justify-between items-center px-margin-desktop py-4 max-w-container-max mx-auto">
           <div className="flex items-center gap-8">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-deep-navy rounded-lg flex items-center justify-center">
-                <span className="material-symbols-outlined text-pure-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>science</span>
-              </div>
+              {tenantInfo?.logo_url ? (
+                <img src={tenantInfo.logo_url} alt="" className="w-9 h-9 rounded-lg object-contain" />
+              ) : isSuperAdmin ? (
+                <img src={superAdminLogo} alt="" className="w-9 h-9 rounded-lg object-contain" />
+              ) : (
+                <div className="w-9 h-9 bg-deep-navy rounded-lg flex items-center justify-center">
+                  <span className="material-symbols-outlined text-pure-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>science</span>
+                </div>
+              )}
             </Link>
             <nav className="hidden lg:flex items-center gap-6">
               {TOPNAV.map((n) =>
@@ -114,12 +133,10 @@ export default function AdminLayout({ children, mainClassName = '' }) {
         <aside className="h-[calc(100vh-80px)] sticky left-0 w-80 bg-pure-white shadow-[4px_0_12px_rgba(16,35,72,0.12)] hidden md:flex flex-col py-8 gap-stack-md z-40">
           <div className="px-6 mb-8">
             <div className="flex items-center gap-3">
-              {isSuperAdmin ? (
-                <div className="w-10 h-10 bg-deep-navy rounded-lg flex items-center justify-center text-pure-white shrink-0">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>rocket_launch</span>
-                </div>
-              ) : tenantInfo?.logo_url ? (
+              {tenantInfo?.logo_url ? (
                 <img src={tenantInfo.logo_url} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0" />
+              ) : isSuperAdmin ? (
+                <img src={superAdminLogo} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0" />
               ) : (
                 <div className="w-10 h-10 bg-indigo-accent/10 rounded-lg flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-indigo-accent">business</span>
@@ -170,13 +187,22 @@ export default function AdminLayout({ children, mainClassName = '' }) {
               Provision Tenant
             </Link>
             <div className="pt-4 border-t border-outline-variant/30 space-y-1">
+              {isSuperAdmin ? (
+                <Link to="/docs/white-label" className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-indigo-accent transition-all">
+                  <span className="material-symbols-outlined text-[18px]">description</span>
+                  <span className="text-label-md">Documentation</span>
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-indigo-accent/10 text-indigo-accent">Super Admin</span>
+                </Link>
+              ) : (
+                <span className="flex items-center gap-3 px-4 py-2 text-on-surface-variant/40 cursor-not-allowed opacity-60" title="Documentation — Super Admin only">
+                  <span className="material-symbols-outlined text-[18px]">description</span>
+                  <span className="text-label-md">Documentation</span>
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Locked</span>
+                </span>
+              )}
               <a className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-indigo-accent transition-all" href="#">
                 <span className="material-symbols-outlined text-[18px]">help</span>
                 <span className="text-label-md">Support</span>
-              </a>
-              <a className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-indigo-accent transition-all" href="#">
-                <span className="material-symbols-outlined text-[18px]">description</span>
-                <span className="text-label-md">Documentation</span>
               </a>
             </div>
           </div>
@@ -203,6 +229,8 @@ export default function AdminLayout({ children, mainClassName = '' }) {
           </footer>
         </main>
       </div>
+      {/* Super Admin only: White-label help bot + video — not visible to Tenant Admin / others */}
+      {isSuperAdmin && <WhiteLabelHelpBot />}
     </div>
   );
 }

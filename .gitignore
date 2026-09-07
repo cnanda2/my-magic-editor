@@ -48,3 +48,9 @@ npm-*
 
 # Firmware build intermediates (keep the .hex outputs)
 /backend/firmware/stage_firmware/build_*/
+
+# Secrets - never commit real credentials
+backend/.env
+
+# Built installer binaries (large; rebuild locally via installer/Build-SetupExe.ps1)
+installer/Output/

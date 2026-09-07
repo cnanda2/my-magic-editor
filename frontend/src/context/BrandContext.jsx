@@ -91,12 +91,21 @@ function applyDocBranding(config) {
     document.title = config.appName;
   }
   if (config.faviconUrl) {
-    let link = document.querySelector('link[rel="icon"]');
-    if (!link) {
-      link = document.createElement('link');
+    const ext = config.faviconUrl.split('.').pop()?.toLowerCase();
+    const mimeType = ext === 'ico' ? 'image/x-icon' : ext === 'svg' ? 'image/svg+xml' : 'image/png';
+    // Update in-place if the tagged element exists (no flash), otherwise replace all
+    const existing = document.getElementById('favicon-icon');
+    if (existing) {
+      existing.type = mimeType;
+      existing.href = config.faviconUrl;
+    } else {
+      document.head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]').forEach((el) => el.remove());
+      const link = document.createElement('link');
+      link.id = 'favicon-icon';
       link.rel = 'icon';
+      link.type = mimeType;
+      link.href = config.faviconUrl;
       document.head.appendChild(link);
     }
-    link.href = config.faviconUrl;
   }
 }

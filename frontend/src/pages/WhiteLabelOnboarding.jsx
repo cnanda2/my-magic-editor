@@ -11,11 +11,10 @@ export default function WhiteLabelOnboarding() {
   const [searchParams] = useSearchParams();
   const tenantIdParam = searchParams.get('tenantId') || searchParams.get('tenant') || searchParams.get('id');
   const [step, setStep] = useState(1);
-  const [platformHost, setPlatformHost] = useState(window.location.hostname || 'localhost');
-  const [cnameTarget, setCnameTarget] = useState(window.location.hostname || 'localhost');
-  const [mode, setMode] = useState('custom'); // custom | subdomain
+  const defaultHost = import.meta.env.VITE_PLATFORM_HOST || (window.location.hostname !== 'localhost' ? window.location.hostname : '');
+  const [platformHost, setPlatformHost] = useState(defaultHost);
+  const [cnameTarget, setCnameTarget] = useState(defaultHost);
   const [customDomain, setCustomDomain] = useState('');
-  const [subdomain, setSubdomain] = useState('');
   const [appName, setAppName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#102348');
   const [secondaryColor, setSecondaryColor] = useState('#EA8E0A');
@@ -38,18 +37,22 @@ export default function WhiteLabelOnboarding() {
     setTenant(t);
     setAppName(t.app_name || t.name || '');
     setLogoUrl(t.logo_url || '');
-    if (t.primary_color) setPrimaryColor(t.primary_color);
-    if (t.secondary_color) setSecondaryColor(t.secondary_color);
-    if (t.custom_domain) { setMode('custom'); setCustomDomain(t.custom_domain); }
-    else if (t.subdomain) { setMode('subdomain'); setSubdomain(t.subdomain); }
+    // Always reset every field to the newly-selected tenant's actual values (falling
+    // back to the default when unset) - leaving a stale value from whichever tenant
+    // was previously loaded risks saving it onto the WRONG tenant.
+    setPrimaryColor(t.primary_color || '#102348');
+    setSecondaryColor(t.secondary_color || '#EA8E0A');
+    setCustomDomain(t.custom_domain || '');
   };
 
   useEffect(() => {
     (async () => {
       try {
         const cfg = await api.get('/tenant/config');
-        setPlatformHost(cfg.data?.platformHost || window.location.hostname);
-        setCnameTarget(cfg.data?.cnameTarget || cfg.data?.platformHost || window.location.hostname);
+        const ph = cfg.data?.platformHost;
+        const ct = cfg.data?.cnameTarget || ph;
+        if (ph && ph !== 'localhost') setPlatformHost(ph);
+        if (ct && ct !== 'localhost') setCnameTarget(ct);
         if (!isSuperAdmin) {
           const r = await api.get('/tenant/settings');
           loadTenantIntoForm(r.data.tenant);
@@ -72,13 +75,13 @@ export default function WhiteLabelOnboarding() {
   }, [isSuperAdmin, tenantIdParam]);
 
   const checkAvailability = async () => {
-    const domain = mode === 'custom' ? customDomain : subdomain;
+    const domain = customDomain;
     if (!domain) return;
     try {
-      const q = mode === 'custom' ? `domain=${encodeURIComponent(domain)}` : `subdomain=${encodeURIComponent(domain)}`;
+      const q = `domain=${encodeURIComponent(domain)}`;
       const { data } = await api.get(`/tenant/check-availability?${q}`);
       setAvailability(data);
-      if (data.available) toast.success(mode==='custom' ? 'Domain available!' : 'Subdomain available!');
+      if (data.available) toast.success('Domain available!');
       else toast.error(data.reason || 'Already taken');
     } catch (e) { toast.error(e.response?.data?.error || 'Check failed'); }
   };
@@ -137,13 +140,19 @@ export default function WhiteLabelOnboarding() {
   useEffect(() => () => stopPolling(), []);
 
   const handleVerify = () => {
-    const domain = mode === 'custom' ? customDomain : (subdomain ? `${subdomain}.${platformHost}` : '');
+    const domain = customDomain;
     if (!domain) return toast.error('Enter domain first');
     startCnamePolling(domain);
   };
 
   const handleSuperAdminTenantChange = async (id) => {
     setSelectedTenantId(id);
+    // A pending logo file / verification status belongs to whichever tenant was
+    // previously loaded - carrying it over risks uploading it to the wrong tenant.
+    setLogoFile(null);
+    setLogoPreview(null);
+    setVerified(null);
+    setAvailability(null);
     try {
       const r = await api.get(`/admin/tenants/${id}`);
       loadTenantIntoForm(r.data.tenant);
@@ -177,9 +186,8 @@ export default function WhiteLabelOnboarding() {
           logo_url: resolvedLogo || undefined,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
-          custom_domain: mode==='custom' ? (customDomain || null) : null,
-          subdomain: mode==='subdomain' ? subdomain : undefined,
-          config: { designTokens, customDomain: mode==='custom'? customDomain : null, appName },
+          custom_domain: customDomain || null,
+          config: { designTokens, customDomain: customDomain || null, appName },
         });
         toast.success('White-label saved for ' + (tenant?.company_name || tenant?.name || selectedTenantId));
         setVerified(true);
@@ -191,12 +199,11 @@ export default function WhiteLabelOnboarding() {
           secondaryColor,
           logoUrl: resolvedLogo || undefined,
         };
-        if (mode === 'custom' && customDomain) payload.customDomain = customDomain;
-        if (mode === 'subdomain' && subdomain) payload.subdomain = subdomain;
+        if (customDomain) payload.customDomain = customDomain;
         const { data } = await api.post('/tenant/white-label/setup', payload);
         toast.success('White-label activated! ' + (data.dnsInstruction?.instructions || ''));
         setStep(3);
-        if (mode === 'custom' && customDomain) {
+        if (customDomain) {
           setTimeout(() => startCnamePolling(customDomain), 500);
         } else {
           setVerified(true);
@@ -209,14 +216,14 @@ export default function WhiteLabelOnboarding() {
     setSaving(false);
   };
 
-  const fullDomainPreview = mode === 'custom' ? (customDomain || 'lab.yourschool.edu') : (subdomain ? `${subdomain}.${platformHost}` : `your-school.${platformHost}`);
+  const fullDomainPreview = customDomain || 'lab.yourschool.edu';
 
   return (
     <AdminLayout>
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-headline-lg text-deep-navy">White-Label Onboarding</h1>
-          <p className="text-body-md text-on-surface-variant mt-1">Go live on your own domain in 3 minutes — same setup as <span className="font-mono text-deep-navy">thestemeducator.com</span></p>
+          <h1 className="text-headline-lg text-deep-navy">White-Label Setup</h1>
+          <p className="text-body-md text-on-surface-variant mt-1">Go live on your own domain in 3 steps — custom domain, your branding, fully managed.</p>
         </div>
 
         {/* Tenant picker for Super Admin - syncs with /tenants */}
@@ -227,7 +234,7 @@ export default function WhiteLabelOnboarding() {
               <p className="text-body-sm text-on-surface-variant">Changes here immediately sync to the Tenants table.</p>
             </div>
             <select value={selectedTenantId} onChange={e=>handleSuperAdminTenantChange(e.target.value)} className="min-w-[220px] px-3 py-2.5 bg-pure-white border border-outline-variant rounded-lg text-body-sm focus:ring-2 focus:ring-indigo-accent/20 outline-none">
-              {allTenants.map(t=> <option key={t.id} value={t.id}>{t.company_name||t.name} — {t.custom_domain || `${t.subdomain}.${platformHost}`} ({t.plan})</option>)}
+              {allTenants.map(t=> <option key={t.id} value={t.id}>{t.company_name||t.name} — {t.custom_domain || '(no domain)'} ({t.plan})</option>)}
             </select>
           </div>
         )}
@@ -245,47 +252,29 @@ export default function WhiteLabelOnboarding() {
 
         {step===1 && (
           <div data-help="domain-mode" className="bg-pure-white rounded-xl border border-outline-variant/20 shadow p-6 space-y-6">
-            <h2 className="text-headline-sm text-deep-navy">Choose your domain</h2>
-            <div className="flex gap-3">
-              <button onClick={()=>setMode('custom')} className={`flex-1 py-3 rounded-xl border-2 text-label-md font-bold ${mode==='custom'?'border-indigo-accent bg-indigo-accent/10 text-indigo-accent':'border-outline-variant/30 text-on-surface-variant'}`}>I own a domain<br/><span className="text-body-sm font-normal">lab.yourschool.edu</span></button>
-              <button onClick={()=>setMode('subdomain')} className={`flex-1 py-3 rounded-xl border-2 text-label-md font-bold ${mode==='subdomain'?'border-indigo-accent bg-indigo-accent/10 text-indigo-accent':'border-outline-variant/30 text-on-surface-variant'}`}>Use a subdomain<br/><span className="text-body-sm font-normal">oakwood.{platformHost}</span></button>
+            <h2 className="text-headline-sm text-deep-navy">Your custom domain</h2>
+            <div>
+              <label className="text-label-md text-deep-navy block mb-2">Domain (already purchased)</label>
+              <div className="flex gap-2">
+                <input value={customDomain} onChange={e=>setCustomDomain(e.target.value.toLowerCase().trim())} placeholder="lab.oakwood.edu" className="flex-1 px-3 py-3 border border-outline-variant/50 rounded-lg text-body-md focus:ring-2 focus:ring-indigo-accent/30 focus:outline-none" />
+                <button onClick={checkAvailability} className="px-4 py-3 bg-surface-container-low border border-outline-variant/30 rounded-lg text-label-md hover:bg-surface-container">Check</button>
+              </div>
+              {availability && <p className={`text-body-sm mt-2 ${availability.available?'text-green-600':'text-red-600'}`}>{availability.available?'Available ✓':'Taken — try another'}</p>}
             </div>
-
-            {mode==='custom' ? (
-              <div>
-                <label className="text-label-md text-deep-navy block mb-2">Your custom domain (already purchased)</label>
-                <div className="flex gap-2">
-                  <input value={customDomain} onChange={e=>setCustomDomain(e.target.value.toLowerCase().trim())} placeholder="lab.oakwood.edu" className="flex-1 px-3 py-3 border border-outline-variant/50 rounded-lg text-body-md focus:ring-2 focus:ring-indigo-accent/30 focus:outline-none" />
-                  <button onClick={checkAvailability} className="px-4 py-3 bg-surface-container-low border border-outline-variant/30 rounded-lg text-label-md hover:bg-surface-container">Check</button>
-                </div>
-                {availability && <p className={`text-body-sm mt-2 ${availability.available?'text-green-600':'text-red-600'}`}>{availability.available?'Available ✓':'Taken — try another'}</p>}
-                <div data-help="cname-box" className="mt-4 p-4 bg-indigo-accent/5 border border-indigo-accent/20 rounded-xl">
-                  <p className="text-body-sm text-deep-navy font-bold mb-1">DNS — 1 record at your provider (GoDaddy / Cloudflare / Route53):</p>
-                  <code className="block bg-deep-navy text-white px-3 py-2 rounded-lg font-mono text-body-sm mt-2">CNAME {customDomain || 'lab.oakwood.edu'} → <span data-help="cname-target">{cnameTarget}</span></code>
-                  <p className="text-body-sm text-on-surface-variant mt-2">If on Cloudflare, enable orange cloud (proxied) for auto SSL. Propagation ~2-5 min.</p>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label className="text-label-md text-deep-navy block mb-2">Subdomain</label>
-                <div className="flex items-center">
-                  <input value={subdomain} onChange={e=>setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))} placeholder="oakwood" className="flex-1 px-3 py-3 border border-outline-variant/50 rounded-l-lg text-body-md focus:ring-2 focus:ring-indigo-accent/30 focus:outline-none" />
-                  <span className="px-3 py-3 bg-surface-container border border-l-0 border-outline-variant/50 rounded-r-lg text-body-sm font-mono">.{platformHost}</span>
-                  <button onClick={checkAvailability} className="ml-2 px-4 py-3 bg-surface-container-low border border-outline-variant/30 rounded-lg text-label-md">Check</button>
-                </div>
-                <p className="text-body-sm text-on-surface-variant mt-2">Instant — no DNS needed. Your site: <span className="font-mono text-deep-navy">https://{fullDomainPreview}</span></p>
-              </div>
-            )}
-
+            <div data-help="cname-box" className="p-4 bg-indigo-accent/5 border border-indigo-accent/20 rounded-xl">
+              <p className="text-body-sm text-deep-navy font-bold mb-1">DNS — add 1 CNAME at your DNS provider:</p>
+              <code className="block bg-deep-navy text-white px-3 py-2 rounded-lg font-mono text-body-sm mt-2">CNAME {customDomain || 'lab.oakwood.edu'} → <span data-help="cname-target">{cnameTarget || 'your-platform-host.com'}</span></code>
+              <p className="text-body-sm text-on-surface-variant mt-2">Propagation ~2–5 min. Works with GoDaddy, Namecheap, Google Domains, or any DNS provider.</p>
+            </div>
             <div className="flex justify-end">
-              <button onClick={()=>setStep(2)} disabled={mode==='custom'? !customDomain : !subdomain} className="px-6 py-3 bg-stem-orange text-white rounded-xl font-bold disabled:opacity-40 hover:brightness-95">Next: Branding →</button>
+              <button onClick={()=>setStep(2)} disabled={!customDomain} className="px-6 py-3 bg-stem-orange text-white rounded-xl font-bold disabled:opacity-40 hover:brightness-95">Next: Branding →</button>
             </div>
           </div>
         )}
 
         {step===2 && (
           <div data-help="branding" className="bg-pure-white rounded-xl border border-outline-variant/20 shadow p-6 space-y-6">
-            <h2 className="text-headline-sm text-deep-navy">Branding — like thestemeducator.com</h2>
+            <h2 className="text-headline-sm text-deep-navy">Branding</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="text-label-md text-deep-navy block mb-2">App name (browser title)</label>
@@ -324,9 +313,9 @@ export default function WhiteLabelOnboarding() {
             <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center"><span className="material-symbols-outlined text-green-600 text-[32px]">verified</span></div>
             <h2 className="text-headline-md text-deep-navy">You're live!</h2>
             <p className="text-body-md text-on-surface-variant">Your white-label is active at <span className="font-mono text-deep-navy font-bold">https://{fullDomainPreview}</span></p>
-            {mode==='custom' && <div className="bg-indigo-accent/5 border border-indigo-accent/20 rounded-xl p-4 text-left">
+            {customDomain && <div className="bg-indigo-accent/5 border border-indigo-accent/20 rounded-xl p-4 text-left">
               <p className="text-body-sm font-bold text-deep-navy">Final step (if not proxied):</p>
-              <p className="text-body-sm text-on-surface-variant mt-1">Ensure <code className="bg-deep-navy/10 px-1 rounded font-mono">{customDomain} → {cnameTarget}</code> is set. Then verify:</p>
+              <p className="text-body-sm text-on-surface-variant mt-1">Ensure <code className="bg-deep-navy/10 px-1 rounded font-mono">{customDomain} → {cnameTarget || 'your-platform-host.com'}</code> is set. Then verify:</p>
               <button data-help="verify-btn" onClick={handleVerify} disabled={verifying} className="mt-3 px-4 py-2 bg-indigo-accent text-white rounded-lg text-label-md disabled:opacity-50 flex items-center gap-2">
                 {verifying ? (
                   <>

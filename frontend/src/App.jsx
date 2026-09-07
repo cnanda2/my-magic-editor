@@ -45,7 +45,7 @@ function SuperAdminRoute({ children }) {
 
 function BrandingRoute({ children }) {
   const { user } = useAuth();
-  // Allow both Super Admin and Tenant Admin to manage white-label branding (like thestemeducator.com)
+  // Allow both Super Admin and Tenant Admin to manage white-label branding
   if (!user || !['Super Admin', 'Tenant Admin'].includes(user.role)) return <Navigate to="/dashboard" replace />;
   return children;
 }

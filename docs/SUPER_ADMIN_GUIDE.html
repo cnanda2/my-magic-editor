@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin — All Tabs Documentation</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  :root { --navy:#102348; --orange:#EA8E0A; --indigo:#4F46E5; --bg:#f7f9fb; --border:#e2e8f0; }
+  *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:#1e293b;line-height:1.6}
+  header{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(16,35,72,.2)}
+  header h1{margin:0;font-size:18px} header p{margin:2px 0 0;font-size:12px;opacity:.7}
+  nav.toc{position:sticky;top:64px;background:#fff;border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:8px;flex-wrap:wrap;overflow:auto}
+  nav.toc a{padding:6px 12px;border-radius:999px;border:1px solid var(--border);font-size:12px;font-weight:600;text-decoration:none;color:#475569;background:#fff}
+  nav.toc a.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--orange);color:#fff;margin-left:8px}
+  section{background:#fff;border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;scroll-margin-top:120px}
+  section h2{margin:0 0 8px;font-size:20px;color:var(--navy);display:flex;align-items:center;gap:8px}
+  section h2 span.icon{width:32px;height:32px;border-radius:8px;background:var(--indigo);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+  section h3{margin:16px 0 8px;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:#64748b}
+  code{background:#0f172a;color:#e2e8f0;padding:2px 6px;border-radius:6px;font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--indigo);color:#fff}
+  a.link{color:var(--indigo);text-decoration:none;font-weight:600}
+  a.link:hover{text-decoration:underline}
+  .notice{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Super Admin — All Tabs Documentation</h1>
+    <p>Synced wizard: /tenants ↔ /white-label ↔ /design • Super Admin only • View at /docs/SUPER_ADMIN_GUIDE.html</p>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:11px;opacity:.7">Help bot + Help video (95s) cover all tabs</div>
+    <a href="/docs/WHITE_LABEL.md" target="_blank" class="link" style="color:#fff;text-decoration:underline">Raw MD</a>
+  </div>
+</header>
+
+<nav class="toc" id="toc">
+  <a href="#dashboard">Dashboard</a>
+  <a href="#users">Users</a>
+  <a href="#roles">Roles</a>
+  <a href="#audit">Audit</a>
+  <a href="#tenants">Tenants</a>
+  <a href="#white-label">White-Label <span class="pill">single</span></a>
+  <a href="#pricing">Pricing</a>
+  <a href="#billing">Billing</a>
+  <a href="#settings">Settings</a>
+  <a href="#help">Help Bot & Video</a>
+</nav>
+
+<div class="wrap">
+
+<section id="dashboard">
+  <h2><span class="icon">📊</span> Dashboard — Global Metrics <a class="link" href="/dashboard">/dashboard</a></h2>
+  <p>Cards: <b>Total Institutions</b> (<code>tenants.length</code>), <b>Active Students</b> (<code>SUM user_count</code>), <b>System Health</b> (<code>active / total</code>). Source: <code>GET /api/admin/tenants</code>. Click cards to jump to /tenants or /users.</p>
+  <div class="notice">Tip: If Active &lt; 90%, check Tenants → Status filter. All Super Admin only.</div>
+</section>
+
+<section id="users">
+  <h2><span class="icon">👥</span> Users — User Directory <a class="link" href="/users">/users</a></h2>
+  <p>Search by name/email, filter by role (<code>Super Admin</code>, <code>Tenant Admin</code>…). Create: <code>POST /api/admin/users</code> with <code>tenant_id</code>. Detail at <code>/users/:id</code> via <code>PATCH /admin/users/:id</code>. Super Admin sees all; Tenant Admin scoped.</p>
+  <h3>Help doc</h3><p><code>docs/USERS.md</code> → <a class="link" href="/docs/USERS.md" target="_blank">/docs/USERS.md</a></p>
+</section>
+
+<section id="roles">
+  <h2><span class="icon">🔐</span> Roles — Role Manager <a class="link" href="/roles">/roles</a></h2>
+  <p>Default: Super Admin, Tenant Admin, Lead Instructor, Lab Tech, Guest Lecturer, Student. Permissions in <code>roles.permissions JSONB</code>. Guards: <code>isSuperAdmin</code> / <code>isAdmin</code>. <code>PATCH /api/admin/roles/:id</code> (Super Admin only).</p>
+  <p>Help: <a class="link" href="/docs/ROLES.md" target="_blank">/docs/ROLES.md</a></p>
+</section>
+
+<section id="audit">
+  <h2><span class="icon">📝</span> Audit — System Logs <a class="link" href="/audit">/audit</a></h2>
+  <p>Table <code>audit_log</code>: <code>TENANT_CREATED</code>, <code>WHITE_LABEL_ONBOARDED</code>, <code>TENANT_BRANDING_UPDATED</code> via <code>writeAudit()</code>. Filter by tenant, action, date. <a class="link" href="/docs/AUDIT.md" target="_blank">/docs/AUDIT.md</a></p>
+</section>
+
+<section id="tenants">
+  <h2><span class="icon">🏫</span> Tenants — Institution Management <a class="link" href="/tenants">/tenants</a></h2>
+  <p><b>Wizard-standard Add New Institution modal</b> (synced with /white-label step 1): Domain toggle Subdomain vs Own domain, branding preview (primary/secondary), plan (Enterprise auto for custom), advanced DNS collapsed. After create → <b>Open wizard</b> → <code>/white-label?tenantId=ID</code>.</p>
+  <div class="grid">
+    <div class="card"><b>Table</b><br>Plan badge, Users bar <code>user_count/user_limit</code>, Status dot. Actions: White-Label → wizard, Manage → detail, Palette → /design.</div>
+    <div class="card"><b>API</b><br><code>GET /api/admin/tenants</code><br><code>POST /api/admin/tenants</code><br><code>PATCH /api/admin/tenants/:id</code></div>
+  </div>
+  <p>Help: <a class="link" href="/docs/TENANTS_DOC.md" target="_blank">/docs/TENANTS_DOC.md</a> • <a class="link" href="/docs/WHITE_LABEL.md" target="_blank">White-Label MD</a></p>
+</section>
+
+<section id="white-label">
+  <h2><span class="icon">🎨</span> White-Label — Single Wizard <a class="link" href="/white-label">/white-label</a> <span class="pill">/design → /white-label</span></h2>
+  <p><b>Why one?</b> Previously two routes (<code>/white-label</code> Setup + <code>/design</code> White-Labeling) were identical. Now <b>single page</b> at <code>/white-label</code>; <code>/design</code> <b>redirects</b> to <code>/white-label?tenantId=X</code> (preserves query). Sidebar shows only one <b>White-Label</b> entry with palette icon.</p>
+  <p><b>Step 1 Domain:</b> <code>oakwood.{host}</code> (instant) vs <code>lab.school.edu → {cnameTarget}</code> (1 CNAME). Check <code>GET /tenant/check-availability</code>. <br><b>Step 2 Branding:</b> logo 2MB → <code>POST /admin/tenants/:id/logo</code>, colors, preset swatches, WCAG, loginHeadline/supportText, app name. <br><b>Step 3 Verify & Go Live:</b> <code>GET /tenant/verify-domain</code> → <code>dns.resolveCname()</code> vs <code>PLATFORM_HOST</code>.</p>
+  <p>Super Admin picker at top → <code>?tenantId=</code> → <code>GET /admin/tenants/:id</code> → save via <code>PATCH /admin/tenants/:id</code> (same columns as Tenants). Tenant Admin uses <code>POST /tenant/white-label/setup</code>. All synced with <code>/tenants</code> table.</p>
+  <p>Help: <a class="link" href="/docs/WHITE_LABEL.md" target="_blank">/docs/WHITE_LABEL.md</a></p>
+</section>
+
+<section id="pricing">
+  <h2><span class="icon">💲</span> Pricing — Pricing Plans <a class="link" href="/pricing">/pricing</a></h2>
+  <p>Plans from <code>billing_plans</code>: Starter, Professional, Enterprise (White-labeled). <code>GET /api/plans</code> public, CRUD <code>/api/admin/plans</code> Super Admin. `page_content` pricing matrix auto. <a class="link" href="/docs/PRICING.md" target="_blank">/docs/PRICING.md</a></p>
+</section>
+
+<section id="billing">
+  <h2><span class="icon">💳</span> Billing — Revenue <a class="link" href="/billing">/billing</a></h2>
+  <p>Stub <code>subscriptions</code> table, <code>stripe_*</code> cols. Future: gate white-label on <code>plan=enterprise</code>. <a class="link" href="/docs/BILLING.md" target="_blank">/docs/BILLING.md</a></p>
+</section>
+
+<section id="settings">
+  <h2><span class="icon">⚙️</span> Settings <a class="link" href="/settings">/settings</a></h2>
+  <p>Super Admin global: <code>PLATFORM_HOST</code>, <code>APP_NAME</code>. Tenant Admin own branding fallback (use wizard for full). <a class="link" href="/docs/SETTINGS.md" target="_blank">/docs/SETTINGS.md</a></p>
+</section>
+
+<section id="help">
+  <h2><span class="icon">💬</span> Help Bot & Video — Super Admin only</h2>
+  <p><b>Bot:</b> Floating <code>?</code> at bottom-right on /tenants, /white-label, /design — only if <code>role === 'Super Admin'</code>. 6 steps with <code>[data-help]</code> highlights. LocalStorage <code>wl-help-seen-*</code>. <b>Video:</b> 95s synthetic player (6 chapters, play/pause, seek) modal from bot — also Super Admin only. Both link to docs above.</p>
+  <div class="card">All help docs → <a class="link" href="/docs/white-label">/docs/white-label</a> (also <a class="link" href="/docs/WHITE_LABEL.md" target="_blank">/docs/WHITE_LABEL.md</a>, <a class="link" href="/docs/API.md" target="_blank">API</a>, <a class="link" href="/docs/DEPLOYMENT.md" target="_blank">Deployment</a>)</div>
+</section>
+
+<p style="text-align:center;color:#64748b;font-size:12px;margin-top:16px">Generated for Super Admin • All tabs in HTML • Synced wizard: /tenants ↔ /white-label ↔ /design • <a class="link" href="/docs/WHITE_LABEL.md">White-Label MD</a></p>
+</div>
+
+<script>
+// highlight TOC active
+const toc = document.querySelectorAll('#toc a');
+const secs = document.querySelectorAll('section');
+window.addEventListener('scroll', () => {
+  let cur = '';
+  secs.forEach(s => { if (window.scrollY >= s.offsetTop - 140) cur = s.id; });
+  toc.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
+});
+</script>
+</body>
+</html>

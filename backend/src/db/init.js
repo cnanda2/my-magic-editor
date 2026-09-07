@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { query } = require('./pool');
 
 async function initDb() {
@@ -262,7 +263,7 @@ async function initDb() {
 
   // ---- upsert default tenant from env -----------------------------------
   const instanceId = process.env.INSTANCE_ID || 'default';
-  const appName = process.env.APP_NAME || 'The STEM Educator';
+  const appName = process.env.APP_NAME || 'Hardware Blocks';
   const companyName = process.env.COMPANY_NAME || '';
   await query(
     `INSERT INTO tenants (id, name, company_name, app_name, instance_id, subdomain)
@@ -270,6 +271,31 @@ async function initDb() {
      ON CONFLICT (id) DO UPDATE SET name = $2, company_name = $3, app_name = $4, instance_id = $5`,
     [instanceId, appName, companyName, appName, instanceId, process.env.SUBDOMAIN || 'app']
   );
+
+  // ---- seed admin accounts from env (written by the setup wizard) -------
+  async function seedAdminIfMissing(email, password, username, role, label) {
+    if (!email || !password) return;
+    const { rows: existing } = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+    if (existing.length > 0) return;
+    const passwordHash = await bcrypt.hash(password, 10);
+    await query(
+      `INSERT INTO users (username, email, password_hash, role, status, tenant_id)
+       VALUES ($1, $2, $3, $4, 'active', $5)`,
+      [username, email, passwordHash, role, instanceId]
+    );
+    // eslint-disable-next-line no-console
+    console.log(`[db] ${label} account created: ${email}`);
+  }
+  await seedAdminIfMissing(process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD, process.env.ADMIN_USERNAME || 'superadmin', 'Super Admin', 'super-admin');
+  await seedAdminIfMissing(process.env.ADMIN2_EMAIL, process.env.ADMIN2_PASSWORD, process.env.ADMIN2_USERNAME || 'admin', 'admin', 'admin');
+
+  // Backfill: Super Admins created without a tenant (e.g. by the setup
+  // wizard) get the instance tenant so Account Info shows a tenant_id and
+  // JWTs carry it. Safe: tenant resolution is host-based; Super Admins stay
+  // global via role checks.
+  try {
+    await query(`UPDATE users SET tenant_id = $1 WHERE tenant_id IS NULL AND role = 'Super Admin'`, [instanceId]);
+  } catch (_) {}
 
   // eslint-disable-next-line no-console
   console.log('[db] schema ready (SaaS multi-tenant)');
