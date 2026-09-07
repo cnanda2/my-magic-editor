@@ -63,7 +63,7 @@ export default function AuditLog() {
         <div>
           <h1 className="text-headline-lg text-deep-navy mb-2">Activity Audit Log</h1>
           <p className="text-body-md text-on-surface-variant max-w-2xl">
-            Monitor system integrity and administrative transparency. Detailed records of every significant event within The STEM Educator ecosystem.
+            Monitor system integrity and administrative transparency. Detailed records of every significant event within this platform.
           </p>
         </div>
       </div>

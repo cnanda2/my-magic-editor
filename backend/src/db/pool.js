@@ -1,6 +1,6 @@
 /**
  * PostgreSQL connection pool
- * Connects to the `thestemeducator` database.
+ * Connects to the configured PostgreSQL database.
  *
  * Configure via environment variables (see backend/.env.example):
  *   DATABASE_URL  -> full connection string (takes priority if set)

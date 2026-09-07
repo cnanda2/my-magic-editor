@@ -54,6 +54,23 @@ export default function Billing() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [currency, setCurrency] = useState('$');
   const [currencySaving, setCurrencySaving] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const loadSubscription = () => {
+    api.get('/billing/subscription').then(r => setSubscription(r.data)).catch(() => {});
+  };
+
+  const openPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const { data } = await api.post('/billing/portal');
+      window.location.href = data.url;
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not open billing portal');
+    }
+    setPortalLoading(false);
+  };
 
   const loadPlans = () => {
     setLoading(true);
@@ -80,7 +97,7 @@ export default function Billing() {
     setCurrencySaving(false);
   };
 
-  useEffect(() => { loadPlans(); loadCurrency(); }, []);
+  useEffect(() => { loadPlans(); loadCurrency(); loadSubscription(); }, []);
 
   const openCreate = () => {
     setEditingId(null);
@@ -167,6 +184,50 @@ export default function Billing() {
           Export Report
         </button>
       </header>
+
+      {/* Live Subscription Status */}
+      {subscription && (
+        <div className="mb-8 bg-pure-white rounded-xl border border-outline-variant/30 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Your Subscription</p>
+            <div className="flex items-center gap-3">
+              <span className="text-headline-md text-deep-navy capitalize">{subscription.plan || 'Starter'}</span>
+              <span className={`px-2 py-0.5 rounded-full text-label-sm font-medium ${
+                subscription.status === 'active' ? 'bg-green-100 text-green-700' :
+                subscription.status === 'trialing' ? 'bg-blue-100 text-blue-700' :
+                subscription.status === 'past_due' ? 'bg-amber-100 text-amber-700' :
+                subscription.status === 'canceled' ? 'bg-red-100 text-red-700' :
+                'bg-surface-container text-on-surface-variant'
+              }`}>
+                {subscription.status || 'none'}
+              </span>
+            </div>
+            {subscription.subscription?.current_period_end && (
+              <p className="text-body-sm text-on-surface-variant mt-1">
+                Renews {new Date(subscription.subscription.current_period_end).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.href = '/pricing'}
+              className="px-4 py-2 border border-outline-variant text-on-surface-variant rounded-lg text-label-md hover:bg-surface-container transition-all"
+            >
+              Change Plan
+            </button>
+            {subscription.subscription?.stripe_subscription_id && (
+              <button
+                onClick={openPortal}
+                disabled={portalLoading}
+                className="px-4 py-2 bg-indigo-accent text-pure-white rounded-lg text-label-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                {portalLoading ? 'Opening...' : 'Manage Billing'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Revenue Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter mb-stack-lg">

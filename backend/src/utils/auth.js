@@ -237,6 +237,35 @@ function setupAuthRoutes(app) {
     }
   });
 
+  // ===== CHANGE PASSWORD (self-service; requires current password) =====
+  app.post('/api/auth/change-password', authRequired, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body || {};
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+      }
+      if (String(newPassword).length < 8) {
+        return res.status(400).json({ error: 'New password must be at least 8 characters' });
+      }
+      const { rows } = await query('SELECT * FROM users WHERE id = $1 LIMIT 1', [req.auth.sub]);
+      const user = rows[0];
+      if (!user || !user.password_hash) {
+        return res.status(400).json({ error: 'This account has no password set (SSO-only login)' });
+      }
+      const ok = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!ok) {
+        writeAudit({ userId: user.id, actorName: user.username, actorRole: user.role, actionType: 'CHANGE_PASSWORD_FAILED', details: 'Wrong current password', ip: clientIp(req) });
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+      const password_hash = await bcrypt.hash(newPassword, 10);
+      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [password_hash, user.id]);
+      writeAudit({ userId: user.id, actorName: user.username, actorRole: user.role, actionType: 'CHANGE_PASSWORD', ip: clientIp(req) });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ===== SSO: start + callback (Google & Microsoft) =====
   for (const [name, cfg] of Object.entries(providers)) {
     // Step 1: redirect the browser to the provider's consent screen.

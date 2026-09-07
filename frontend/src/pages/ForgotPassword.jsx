@@ -34,7 +34,7 @@ export default function ForgotPassword() {
         </div>
         <div className="relative z-10 max-w-xl text-pure-white space-y-stack-md px-8">
           <div className="bg-white/10 backdrop-blur-sm px-6 py-4 rounded-xl inline-block border border-white/20">
-            <img src="/logo.png" alt="The STEM Educator" className="h-8 w-auto" />
+            <img src="/logo.png" alt="Platform Logo" className="h-8 w-auto" />
           </div>
           <h1 className="text-headline-xl leading-tight">Empowering the next generation of innovators.</h1>
           <p className="text-body-lg opacity-90 leading-relaxed">

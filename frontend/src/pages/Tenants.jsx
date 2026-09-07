@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
 import api from '../utils/api';
@@ -50,13 +50,41 @@ export default function Tenants() {
   const [planFilter, setPlanFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', companyName: '', subdomain: '', appName: '', plan: 'professional', ownerEmail: '', userLimit: 10, tempPassword: '', customDomain: '', cloudflareZoneId: '', cloudflareApiToken: '', proxied: false, cnameTarget: '' });
+  const EMPTY_FORM = { name: '', companyName: '', appName: '', plan: 'professional', ownerEmail: '', userLimit: 10, tempPassword: '', customDomain: '', cloudflareZoneId: '', cloudflareApiToken: '', proxied: false, cnameTarget: '', primaryColor: '#102348', secondaryColor: '#EA8E0A' };
+  const [form, setForm] = useState(EMPTY_FORM);
   const [creating, setCreating] = useState(false);
   const [createdCreds, setCreatedCreds] = useState(null);
+  const [createdTenantId, setCreatedTenantId] = useState(null);
+  const [wizardCountdown, setWizardCountdown] = useState(null);
+  const countdownRef = useRef(null);
+  const [showAdvancedDns, setShowAdvancedDns] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 8;
-  const [platformHost, setPlatformHost] = useState(window.location.hostname || 'localhost');
-  const [cnameTarget, setCnameTarget] = useState(window.location.hostname || 'localhost');
+  const defaultHost = import.meta.env.VITE_PLATFORM_HOST || (window.location.hostname !== 'localhost' ? window.location.hostname : 'your-platform-host.com');
+  const [platformHost, setPlatformHost] = useState(defaultHost);
+  const [cnameTarget, setCnameTarget] = useState(defaultHost);
+
+  const startWizardCountdown = useCallback((tenantId) => {
+    setWizardCountdown(4);
+    let secs = 4;
+    countdownRef.current = setInterval(() => {
+      secs -= 1;
+      setWizardCountdown(secs);
+      if (secs <= 0) {
+        clearInterval(countdownRef.current);
+        setCreatedCreds(null);
+        setCreatedTenantId(null);
+        setWizardCountdown(null);
+        navigate(`/white-label?tenantId=${tenantId}`);
+      }
+    }, 1000);
+  }, [navigate]);
+
+  const cancelCountdown = useCallback(() => {
+    clearInterval(countdownRef.current);
+    setWizardCountdown(null);
+  }, []);
 
   const load = () => {
     setLoading(true);
@@ -66,17 +94,21 @@ export default function Tenants() {
     }).catch(() => {}).finally(() => setLoading(false));
   };
 
+  useEffect(() => { return () => clearInterval(countdownRef.current); }, []);
+
   useEffect(() => {
     load();
     api.get('/tenant/config').then(r => {
-      if (r.data?.platformHost) setPlatformHost(r.data.platformHost);
-      if (r.data?.cnameTarget) setCnameTarget(r.data.cnameTarget);
+      const h = r.data?.platformHost;
+      const c = r.data?.cnameTarget;
+      if (h && h !== 'localhost') setPlatformHost(h);
+      if (c && c !== 'localhost') setCnameTarget(c);
     }).catch(() => {});
   }, []);
 
   const filtered = useMemo(() => {
     let list = tenants;
-    if (search) list = list.filter(t => (t.company_name || t.name || '').toLowerCase().includes(search.toLowerCase()) || (t.subdomain || '').toLowerCase().includes(search.toLowerCase()) || (t.app_name || '').toLowerCase().includes(search.toLowerCase()));
+    if (search) list = list.filter(t => (t.company_name || t.name || '').toLowerCase().includes(search.toLowerCase()) || (t.custom_domain || '').toLowerCase().includes(search.toLowerCase()) || (t.app_name || '').toLowerCase().includes(search.toLowerCase()));
     if (planFilter !== 'All') list = list.filter(t => t.plan === planFilter);
     if (statusFilter !== 'All') list = list.filter(t => t.status === statusFilter);
     return list;
@@ -90,35 +122,54 @@ export default function Tenants() {
   const totalUsers = tenants.reduce((s, t) => s + (t.user_count || 0), 0);
 
   const create = async () => {
-    if (!form.name) { toast.error('Tenant name is required'); return; }
-    if (form.customDomain && !form.cloudflareZoneId) { toast.error('Cloudflare Zone ID is required for a custom domain'); return; }
-    if (form.customDomain && !form.cloudflareApiToken) { toast.error('Cloudflare API token is required to create the CNAME'); return; }
+    if (!form.name) { toast.error('Institution name is required'); return; }
+    if (form.customDomain && !/^([a-z0-9-]+\.)+[a-z]{2,}$/i.test(form.customDomain)) { toast.error('Invalid custom domain'); return; }
     setCreating(true);
     try {
+      // Typing an email without a password used to silently skip creating a login.
+      // Auto-generate one so "just an email" always works as expected.
+      const tempPassword = form.tempPassword || (form.ownerEmail ? 'Temp-' + Math.random().toString(36).slice(2, 8) + '1!' : undefined);
       const res = await api.post('/admin/tenants', {
         name: form.name,
         company_name: form.companyName,
-        subdomain: form.subdomain,
         app_name: form.appName,
         plan: form.plan,
         owner_email: form.ownerEmail,
         user_limit: parseInt(form.userLimit, 10) || 10,
-        temp_password: form.tempPassword || undefined,
+        temp_password: tempPassword,
         custom_domain: form.customDomain || undefined,
-        cloudflare_zone_id: form.cloudflareZoneId || undefined,
-        cloudflare_api_token: form.cloudflareApiToken || undefined,
+        cloudflare_zone_id: showAdvancedDns ? form.cloudflareZoneId || undefined : undefined,
+        cloudflare_api_token: showAdvancedDns ? form.cloudflareApiToken || undefined : undefined,
         proxied: form.proxied,
         cname_target: form.cnameTarget || undefined,
       });
+      const created = res.data?.tenant;
       const createdUser = res.data?.user;
       const cname = res.data?.cname;
-      if (createdUser) {
-        setCreatedCreds({ username: createdUser.username, password: form.tempPassword, cname });
-      } else {
-        toast.success(cname ? `Tenant created — CNAME ${cname.recordName} → ${cname.recordContent} live` : 'Tenant created');
+      // also sync branding colors if set (wizard standard)
+      if (created && (form.primaryColor !== '#102348' || form.secondaryColor !== '#EA8E0A' || form.appName)) {
+        try {
+          await api.patch(`/admin/tenants/${created.id}`, {
+            primary_color: form.primaryColor,
+            secondary_color: form.secondaryColor,
+            app_name: form.appName || undefined,
+            config: { designTokens: { colors: { primary: form.primaryColor, secondary: form.secondaryColor } } },
+          });
+        } catch {}
       }
+      const tid = created?.id || null;
+      if (created) setCreatedTenantId(tid);
       setShowCreate(false);
-      setForm({ name: '', companyName: '', subdomain: '', appName: '', plan: 'professional', ownerEmail: '', userLimit: 10, tempPassword: '', customDomain: '', cloudflareZoneId: '', cloudflareApiToken: '', proxied: false, cnameTarget: '' });
+      if (createdUser) {
+        setCreatedCreds({ username: createdUser.username, password: tempPassword, cname, tenantId: tid });
+      } else {
+        setCreatedCreds({ username: null, password: null, cname, tenantId: tid });
+      }
+      setCreatedTenantId(tid);
+      if (tid) startWizardCountdown(tid);
+      setForm(EMPTY_FORM);
+      setShowMore(false);
+      setShowAdvancedDns(false);
       load();
     } catch (e) {
       toast.error(e.response?.data?.error || 'Failed to create tenant');
@@ -139,7 +190,7 @@ export default function Tenants() {
             <h1 className="text-headline-xl text-deep-navy">Institution Management</h1>
             <p className="text-body-lg text-on-surface-variant">Oversee and manage all registered institutions, plans, and access across the platform.</p>
           </div>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-stem-orange text-pure-white px-5 py-2.5 rounded-lg hover:brightness-95 transition-all shrink-0 self-start md:self-auto">
+          <button data-help="add-institution" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-stem-orange text-pure-white px-5 py-2.5 rounded-lg hover:brightness-95 transition-all shrink-0 self-start md:self-auto">
             <span className="material-symbols-outlined text-[20px]">domain_add</span>Add New Institution
           </button>
         </div>
@@ -182,7 +233,7 @@ export default function Tenants() {
             <input
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search by name, subdomain, or app name..."
+              placeholder="Search by name, domain, or app name..."
               className="w-full pl-12 pr-4 py-3 rounded-lg border border-outline-variant focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition-all text-body-sm"
             />
           </div>
@@ -232,7 +283,7 @@ export default function Tenants() {
                           </div>
                           <div>
                             <div className="text-label-md text-deep-navy">{t.company_name || t.name}</div>
-                            <div className="text-body-sm text-on-surface-variant">{t.custom_domain ? `${t.custom_domain}` : `${t.subdomain}.${platformHost}`}</div>
+                            <div className="text-body-sm text-on-surface-variant">{t.custom_domain || '—'}</div>
                           </div>
                         </div>
                       </td>
@@ -248,10 +299,10 @@ export default function Tenants() {
                       <td className="px-6 py-4"><StatusDot status={t.status} /></td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={e => { e.stopPropagation(); navigate(`/tenants/${t.id}`); }} className="text-label-sm text-indigo-accent hover:underline">Manage</button>
-                          <button onClick={e => { e.stopPropagation(); navigate(`/tenants/${t.id}/edit`); }} className="p-2 rounded-lg hover:bg-bg-off-white transition-colors">
-                            <span className="material-symbols-outlined text-outline text-[20px]">edit</span>
+                          <button onClick={e => { e.stopPropagation(); navigate(`/white-label?tenantId=${t.id}`); }} title="White-Label (single — replaces /design)" className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-accent/10 text-indigo-accent text-label-sm hover:bg-indigo-accent/20 transition-colors">
+                            <span className="material-symbols-outlined text-[16px]">palette</span> White-Label
                           </button>
+                          <button onClick={e => { e.stopPropagation(); navigate(`/tenants/${t.id}`); }} className="text-label-sm text-indigo-accent hover:underline">Manage</button>
                         </div>
                       </td>
                     </tr>
@@ -322,33 +373,65 @@ export default function Tenants() {
 
         {/* ── Credentials Success Modal ────────────────────────── */}
         {createdCreds && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setCreatedCreds(null)}>
-            <div className="bg-pure-white rounded-xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+            <div className="bg-pure-white rounded-xl w-full max-w-md shadow-2xl p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-emerald-600">check_circle</span>
                 </div>
-                <h2 className="text-headline-sm text-deep-navy">Tenant Created</h2>
+                <div>
+                  <h2 className="text-headline-sm text-deep-navy leading-tight">Institution Created!</h2>
+                  {wizardCountdown !== null && (
+                    <p className="text-body-sm text-indigo-accent mt-0.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
+                      Opening wizard in <span className="font-bold">{wizardCountdown}s</span>…
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="text-body-sm text-on-surface-variant mb-4">Admin credentials generated. Share these securely with the tenant admin.</p>
-              <div className="bg-bg-off-white rounded-lg p-4 space-y-3 border border-outline-variant">
-                <div>
-                  <span className="text-label-sm text-on-surface-variant">Username</span>
-                  <div className="text-label-md text-deep-navy font-mono mt-0.5">{createdCreds.username}</div>
+
+              {/* Countdown bar */}
+              {wizardCountdown !== null && (
+                <div className="h-1 bg-surface-container rounded-full overflow-hidden mt-3 mb-4">
+                  <div className="h-full bg-indigo-accent transition-all duration-1000 ease-linear" style={{ width: `${((4 - wizardCountdown) / 4) * 100}%` }} />
                 </div>
-                <div>
-                  <span className="text-label-sm text-on-surface-variant">Password</span>
-                  <div className="text-label-md text-deep-navy font-mono mt-0.5">{createdCreds.password}</div>
-                </div>
+              )}
+
+              {/* Credentials */}
+              <div className="bg-bg-off-white rounded-lg p-4 space-y-3 border border-outline-variant mb-5">
+                {createdCreds.username ? (
+                  <>
+                    <div>
+                      <span className="text-label-sm text-on-surface-variant">Username</span>
+                      <div className="text-label-md text-deep-navy font-mono mt-0.5">{createdCreds.username}</div>
+                    </div>
+                    <div>
+                      <span className="text-label-sm text-on-surface-variant">Password</span>
+                      <div className="text-label-md text-deep-navy font-mono mt-0.5">{createdCreds.password}</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-body-sm text-on-surface-variant">Tenant ready. Finish white-label setup in the wizard.</div>
+                )}
                 {createdCreds.cname && (
                   <div className="pt-2 border-t border-outline-variant">
-                    <span className="text-label-sm text-on-surface-variant">CNAME record created</span>
+                    <span className="text-label-sm text-on-surface-variant">CNAME auto-created</span>
                     <div className="text-body-sm text-deep-navy font-mono mt-0.5">{createdCreds.cname.recordName} → {createdCreds.cname.recordContent}</div>
                   </div>
                 )}
               </div>
-              <div className="flex justify-end mt-6">
-                <button onClick={() => setCreatedCreds(null)} className="px-5 py-2.5 text-label-sm font-medium bg-deep-navy text-pure-white rounded-lg hover:opacity-90 transition">Got it</button>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button onClick={() => { cancelCountdown(); setCreatedCreds(null); setCreatedTenantId(null); }} className="flex-1 px-4 py-2.5 text-label-sm font-medium border border-outline-variant rounded-lg hover:bg-bg-off-white transition">
+                  Stay here
+                </button>
+                {createdTenantId && (
+                  <button onClick={() => { cancelCountdown(); setCreatedCreds(null); navigate(`/white-label?tenantId=${createdTenantId}`); }} className="flex-1 px-4 py-2.5 text-label-sm font-medium bg-indigo-accent text-pure-white rounded-lg hover:opacity-90 transition flex items-center justify-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">rocket_launch</span> Open Wizard Now
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -364,88 +447,94 @@ export default function Tenants() {
                   <span className="material-symbols-outlined text-on-surface-variant">close</span>
                 </button>
               </div>
-              <div className="overflow-y-auto px-6 py-5 space-y-4">
+              <div className="overflow-y-auto px-6 py-5 space-y-5">
                 <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Tenant Name <span className="text-red-400">*</span></label>
-                  <input placeholder="e.g. Oakwood Academy" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Institution Name <span className="text-red-400">*</span></label>
+                  <input autoFocus placeholder="e.g. Oakwood Academy" value={form.name} onChange={e => setForm({...form, name: e.target.value})} onKeyDown={e => { if (e.key === 'Enter' && form.name) create(); }} className="w-full p-3 border border-outline-variant rounded-lg text-body-md focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Company Name</label>
-                  <input placeholder="e.g. Oakwood School District" value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
-                </div>
-                <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Subdomain</label>
-                  <div className="relative">
-                    <input placeholder="e.g. oakwood" value={form.subdomain} onChange={e => setForm({...form, subdomain: e.target.value})} className="w-full p-2.5 pr-32 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-body-sm text-on-surface-variant">.{platformHost}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">App Name</label>
-                  <input placeholder="e.g. Oakwood STEM Portal" value={form.appName} onChange={e => setForm({...form, appName: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
-                </div>
-                <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Owner Email</label>
+                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Owner Email <span className="text-on-surface-variant/60">(optional — creates their login)</span></label>
                   <input type="email" placeholder="admin@school.edu" value={form.ownerEmail} onChange={e => setForm({...form, ownerEmail: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Temporary Password <span className="text-stem-orange">(optional)</span></label>
-                  <input type="text" placeholder="e.g. Temp@1234" value={form.tempPassword} onChange={e => setForm({...form, tempPassword: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition font-mono" />
-                  <p className="text-[11px] text-on-surface-variant mt-1">If set, a Tenant Admin user is created automatically with this password.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-label-sm text-on-surface-variant mb-1.5">Plan</label>
-                    <select value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition">
-                      <option value="standard">Standard</option>
-                      <option value="professional">Professional</option>
-                      <option value="enterprise">Enterprise</option>
-                      <option value="free">Free</option>
-                      <option value="trial">Trial</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-label-sm text-on-surface-variant mb-1.5">User Limit</label>
-                    <input type="number" min="1" value={form.userLimit} onChange={e => setForm({...form, userLimit: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
-                  </div>
+                  <label className="block text-label-sm text-on-surface-variant mb-1.5">Custom Domain <span className="text-on-surface-variant/60">(optional — already purchased)</span></label>
+                  <input placeholder="e.g. lab.school.edu" value={form.customDomain} onChange={e => setForm({...form, customDomain: e.target.value.toLowerCase().trim()})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                  <p className="text-[11px] text-on-surface-variant mt-1">You can also add this later - the white-label wizard opens automatically after creating.</p>
                 </div>
 
-                <div className="pt-4 border-t border-outline-variant/40">
-                  <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">White-label Domain (optional)</p>
-                  <div>
-                    <label className="block text-label-sm text-on-surface-variant mb-1.5">Tenant Custom Domain</label>
-                    <div className="relative">
-                      <input placeholder="e.g. lab.school.edu" value={form.customDomain} onChange={e => setForm({...form, customDomain: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                <button type="button" onClick={() => setShowMore(!showMore)} className="text-label-sm text-indigo-accent hover:underline flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">{showMore ? 'expand_less' : 'expand_more'}</span>
+                  More options <span className="text-on-surface-variant/60 font-normal">(branding, plan, DNS - all editable later)</span>
+                </button>
+
+                {showMore && (
+                  <div className="space-y-5 pt-1">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-label-sm text-on-surface-variant mb-1.5">Company Name</label>
+                        <input placeholder="e.g. Oakwood School District" value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                      </div>
+                      <div>
+                        <label className="block text-label-sm text-on-surface-variant mb-1.5">App Name (browser title)</label>
+                        <input placeholder="e.g. Oakwood STEM Portal" value={form.appName} onChange={e => setForm({...form, appName: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-on-surface-variant mt-1">Uses the tenant's own domain instead of a platform subdomain. A CNAME record is created automatically.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-3">
+
                     <div>
-                      <label className="block text-label-sm text-on-surface-variant mb-1.5">Cloudflare Zone ID</label>
-                      <input value={form.cloudflareZoneId} onChange={e => setForm({...form, cloudflareZoneId: e.target.value})} placeholder="e.g. 02c9e6b1..." className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition font-mono" />
+                      <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">Branding</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-label-sm text-on-surface-variant mb-1.5">Primary color</label><div className="flex gap-2"><input type="color" value={form.primaryColor} onChange={e=>setForm({...form, primaryColor:e.target.value})} className="w-10 h-9 rounded border cursor-pointer p-0" /><input value={form.primaryColor} onChange={e=>setForm({...form, primaryColor:e.target.value})} className="flex-1 px-2 py-2 border rounded-lg text-body-sm font-mono" /></div></div>
+                        <div><label className="block text-label-sm text-on-surface-variant mb-1.5">Secondary color</label><div className="flex gap-2"><input type="color" value={form.secondaryColor} onChange={e=>setForm({...form, secondaryColor:e.target.value})} className="w-10 h-9 rounded border cursor-pointer p-0" /><input value={form.secondaryColor} onChange={e=>setForm({...form, secondaryColor:e.target.value})} className="flex-1 px-2 py-2 border rounded-lg text-body-sm font-mono" /></div></div>
+                      </div>
+                      <div className="mt-3 p-3 rounded-lg border flex items-center gap-3" style={{borderColor: form.primaryColor}}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold" style={{backgroundColor: form.primaryColor}}>{form.name?form.name[0]:'S'}</div>
+                        <div><p className="text-body-sm font-bold text-deep-navy">{form.appName || form.name || 'YourBrand'}</p><p className="text-[11px] font-mono text-on-surface-variant">{form.customDomain || 'lab.school.edu'}</p></div>
+                      </div>
                     </div>
+
                     <div>
-                      <label className="block text-label-sm text-on-surface-variant mb-1.5">Cloudflare API Token</label>
-                      <input type="password" value={form.cloudflareApiToken} onChange={e => setForm({...form, cloudflareApiToken: e.target.value})} placeholder="zone DNS edit permission" className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition font-mono" />
+                      <label className="block text-label-sm text-on-surface-variant mb-1.5">Temporary Password <span className="text-on-surface-variant/60">(auto-generated if left blank and an email is given)</span></label>
+                      <input type="text" placeholder="Temp@1234" value={form.tempPassword} onChange={e => setForm({...form, tempPassword: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition font-mono" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-label-sm text-on-surface-variant mb-1.5">Plan</label>
+                        <select value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition">
+                          <option value="standard">Standard</option>
+                          <option value="professional">Professional</option>
+                          <option value="enterprise">Enterprise — white-label</option>
+                          <option value="free">Free</option>
+                          <option value="trial">Trial</option>
+                        </select>
+                        {form.customDomain && form.plan!=='enterprise' && <p className="text-[11px] text-amber-600 mt-1">Custom domain typically requires an Enterprise plan.</p>}
+                      </div>
+                      <div>
+                        <label className="block text-label-sm text-on-surface-variant mb-1.5">User Limit</label>
+                        <input type="number" min="1" value={form.userLimit} onChange={e => setForm({...form, userLimit: e.target.value})} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-outline-variant/40">
+                      <button type="button" onClick={()=>setShowAdvancedDns(!showAdvancedDns)} className="text-label-sm text-indigo-accent hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">{showAdvancedDns?'expand_less':'expand_more'}</span> Advanced DNS (auto-CNAME) — optional</button>
+                      {showAdvancedDns && (
+                        <div className="mt-3 space-y-3 p-3 bg-surface-container-low rounded-lg border">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div><label className="block text-label-sm text-on-surface-variant mb-1.5">DNS Zone ID</label><input value={form.cloudflareZoneId} onChange={e => setForm({...form, cloudflareZoneId: e.target.value})} placeholder="Zone ID..." className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm font-mono" /></div>
+                            <div><label className="block text-label-sm text-on-surface-variant mb-1.5">DNS API Token</label><input type="password" value={form.cloudflareApiToken} onChange={e => setForm({...form, cloudflareApiToken: e.target.value})} placeholder="API token with DNS edit" className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm font-mono" /></div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div><label className="block text-label-sm text-on-surface-variant mb-1.5">CNAME Target</label><input value={form.cnameTarget} onChange={e => setForm({...form, cnameTarget: e.target.value})} placeholder={`defaults to ${cnameTarget}`} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm" /></div>
+                            <label className="flex items-center gap-2 cursor-pointer pt-6"><input type="checkbox" checked={form.proxied} onChange={e => setForm({...form, proxied: e.target.checked})} className="h-4 w-4 rounded border-outline-variant text-indigo-accent" /><span className="text-label-sm text-on-surface-variant">Enable proxy</span></label>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div>
-                      <label className="block text-label-sm text-on-surface-variant mb-1.5">CNAME Target (optional)</label>
-                      <input value={form.cnameTarget} onChange={e => setForm({...form, cnameTarget: e.target.value})} placeholder={`defaults to ${cnameTarget}`} className="w-full p-2.5 border border-outline-variant rounded-lg text-body-sm focus:border-indigo-accent focus:ring-2 focus:ring-indigo-accent/20 outline-none transition" />
-                    </div>
-                    <div className="flex items-end pb-2.5">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={form.proxied} onChange={e => setForm({...form, proxied: e.target.checked})} className="h-4 w-4 rounded border-outline-variant text-indigo-accent focus:ring-indigo-accent" />
-                        <span className="text-label-sm text-on-surface-variant">Proxied via Cloudflare</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 px-6 pb-6 pt-4 border-t border-outline-variant">
                 <button onClick={() => setShowCreate(false)} className="px-5 py-2.5 text-label-sm font-medium border border-outline-variant rounded-lg hover:bg-bg-off-white transition">Cancel</button>
-                <button onClick={create} disabled={creating} className="px-5 py-2.5 text-label-sm font-medium bg-stem-orange text-pure-white rounded-lg hover:brightness-95 disabled:opacity-50 transition">{creating ? 'Creating...' : 'Create Institution'}</button>
+                <button onClick={create} disabled={creating || !form.name} className="px-5 py-2.5 text-label-sm font-medium bg-stem-orange text-pure-white rounded-lg hover:brightness-95 disabled:opacity-50 transition">{creating ? 'Creating...' : 'Create Institution'}</button>
               </div>
             </div>
           </div>

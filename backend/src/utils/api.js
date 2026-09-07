@@ -206,12 +206,18 @@ function setupAPIRoutes(app, managers) {
     try {
       const { boardType, port } = req.body;
       const firmwarePath = req.file.path;
-      
-      const result = await firmwareUploader.upload(boardType, port, firmwarePath, (progress) => {
-        // Could use SSE here for progress updates
-      });
-      
-      res.json({ success: true, result });
+      if (port && !lockPort(port)) {
+        return res.status(409).json({ error: 'An upload on ' + port + ' is already running. Please wait for it to finish.' });
+      }
+      try {
+        const result = await firmwareUploader.upload(boardType, port, firmwarePath, (progress) => {
+          // Could use SSE here for progress updates
+        });
+
+        res.json({ success: true, result });
+      } finally {
+        if (port) unlockPort(port);
+      }
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -227,36 +233,85 @@ function setupAPIRoutes(app, managers) {
     await dly(2500);
   }
 
+  // Serialize flash operations per port: concurrent uploads fight over COM
+  // ports ("unable to open port") and all fail. Second caller gets 409 so the
+  // UI can tell the user an upload is already running instead of piling on.
+  const portLocks = new Map();
+  function lockPort(port) {
+    if (portLocks.get(port)) return false;
+    portLocks.set(port, true);
+    return true;
+  }
+  function unlockPort(port) {
+    portLocks.delete(port);
+  }
+
   app.post('/api/firmware/upload-stage', authRequired, async (req, res) => {
     try {
       const { boardType, port } = req.body;
-      writeAudit({ userId: req.auth?.sub, actionType: 'FIRMWARE_UPLOAD_STAGE', details: `board=${boardType} port=${port}`, ip: clientIp(req) });
+      if (!port) return res.status(400).json({ error: 'No port specified' });
+      if (!lockPort(port)) {
+        return res.status(409).json({ error: 'An upload on ' + port + ' is already running. Please wait for it to finish.' });
+      }
+      try {
+        writeAudit({ userId: req.auth?.sub, actionType: 'FIRMWARE_UPLOAD_STAGE', details: `board=${boardType} port=${port}`, ip: clientIp(req) });
       const sketchDir = path.join(__dirname, '..', '..', 'firmware', 'stage_firmware');
       const inoPath = path.join(sketchDir, 'stage_firmware.ino');
-      
-      if (!fs.existsSync(inoPath)) {
-        return res.status(404).json({ error: 'Stage firmware not found at ' + inoPath });
-      }
-      
-      const cppCode = fs.readFileSync(inoPath, 'utf8');
       const fqbn = boardFqbnMap[boardType] || 'arduino:avr:uno';
-      const compileResult = arduinoCompiler.compile(cppCode, fqbn);
-      
+
+      // Prefer prebuilt .hex (no arduino-cli compile needed, faster + offline).
+      // Falls back to compiling the .ino from source.
+      const prebuiltHex = {
+        arduino_uno: 'stage_firmware_uno.hex',
+        arduino_nano: 'stage_firmware_nano.hex',
+        arduino_mega: 'stage_firmware_mega2560.hex',
+      }[boardType];
+      const hexPath = prebuiltHex ? path.join(sketchDir, prebuiltHex) : null;
+
+      let compileOutput = '';
+      let hexToUpload = null;
+      if (hexPath && fs.existsSync(hexPath)) {
+        compileOutput = 'Using prebuilt ' + prebuiltHex;
+      } else {
+        if (!fs.existsSync(inoPath)) {
+          return res.status(404).json({ error: 'Stage firmware not found at ' + inoPath + (hexPath ? ' (and no ' + prebuiltHex + ')' : '') });
+        }
+        const cppCode = fs.readFileSync(inoPath, 'utf8');
+        const compileResult = arduinoCompiler.compile(cppCode, fqbn);
+        compileOutput = compileResult.output;
+        hexToUpload = compileResult.hexPath;
+        // cleanup of the temp sketch happens below after upload
+        var _tmpSketchPath = compileResult.sketchPath;
+      }
+
       await resetBoard(port);
-      
-      const uploadResult = arduinoCompiler.upload(compileResult.hexPath, port, fqbn);
+
+      let uploadResult;
+      if (hexToUpload) {
+        uploadResult = arduinoCompiler.upload(hexToUpload, port, fqbn);
+      } else {
+        // firmwareUploader.upload handles .hex directly via avrdude
+        uploadResult = await firmwareUploader.upload(boardType, port, hexPath, null);
+      }
       let newDevice;
       if (serialManager) {
         try { newDevice = await serialManager.connect(port, { baudRate: 115200, boardType: boardType }); } catch (e) {}
       }
-      
-      arduinoCompiler.cleanup(compileResult.sketchPath);
+
+      if (typeof _tmpSketchPath !== 'undefined' && _tmpSketchPath) {
+        arduinoCompiler.cleanup(_tmpSketchPath);
+      }
+      // uploadResult may be a string (avrdude output) or {output}; normalize
+      const uploadOutput = typeof uploadResult === 'string' ? uploadResult : (uploadResult && uploadResult.output) || '';
       res.json({
         success: true,
-        compileOutput: compileResult.output,
-        uploadOutput: uploadResult.output,
+        compileOutput: compileOutput,
+        uploadOutput: uploadOutput,
         device: newDevice ? { id: newDevice.id, path: newDevice.path, baudRate: newDevice.baudRate, boardType: newDevice.boardType } : null
       });
+      } finally {
+        unlockPort(port);
+      }
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -303,11 +358,18 @@ function setupAPIRoutes(app, managers) {
       if (!code) return res.status(400).json({ error: 'No code provided' });
       if (!port) return res.status(400).json({ error: 'No port specified' });
       port = normalizePort(port);
-      writeAudit({ userId: req.auth?.sub, actionType: 'COMPILE_UPLOAD', details: `port=${port} board=${board}`, ip: clientIp(req) });
+      if (!lockPort(port)) {
+        return res.status(409).json({ error: 'An upload on ' + port + ' is already running. Please wait for it to finish.' });
+      }
+      try {
+        writeAudit({ userId: req.auth?.sub, actionType: 'COMPILE_UPLOAD', details: `port=${port} board=${board}`, ip: clientIp(req) });
 
-      const fqbn = board || 'arduino:avr:uno';
-      const result = await arduinoCompiler.compileAndUpload(code, port, fqbn, null, serialManager);
-      res.json(result);
+        const fqbn = board || 'arduino:avr:uno';
+        const result = await arduinoCompiler.compileAndUpload(code, port, fqbn, null, serialManager);
+        res.json(result);
+      } finally {
+        unlockPort(port);
+      }
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -321,6 +383,9 @@ function setupAPIRoutes(app, managers) {
       let { port, board } = req.body;
       if (!port) return res.status(400).json({ error: 'No port specified' });
       port = normalizePort(port);
+      if (!lockPort(port)) {
+        return res.status(409).json({ error: 'An upload on ' + port + ' is already running. Please wait for it to finish.' });
+      }
 
       const fqbn = board || 'arduino:avr:uno';
       const emptyCode = 'void setup() { pinMode(13, OUTPUT); digitalWrite(13, LOW); }\nvoid loop() { }\n';
@@ -334,6 +399,7 @@ function setupAPIRoutes(app, managers) {
         uploadResult = arduinoCompiler.upload(compileResult.hexPath, port, fqbn);
       } finally {
         // Do NOT reconnect — cleared code runs standalone
+        unlockPort(port);
       }
 
       arduinoCompiler.cleanup(compileResult.sketchPath);
@@ -354,6 +420,9 @@ function setupAPIRoutes(app, managers) {
 
       const normalizePort = (p) => (p || '').toUpperCase().replace(/^COM(\d+)$/, 'COM$1');
       const normPort = normalizePort(port);
+      if (!lockPort(normPort)) {
+        return res.status(409).json({ error: 'An upload on ' + normPort + ' is already running. Please wait for it to finish.' });
+      }
       const fqbn = board || 'arduino:avr:uno';
 
       let compileResult, uploadResult;
@@ -365,6 +434,7 @@ function setupAPIRoutes(app, managers) {
         uploadResult = arduinoCompiler.upload(compileResult.hexPath, normPort, fqbn);
       } finally {
         // Do NOT reconnect — uploaded code runs standalone
+        unlockPort(normPort);
       }
 
       arduinoCompiler.cleanup(compileResult.sketchPath);
@@ -385,7 +455,7 @@ function setupAPIRoutes(app, managers) {
   // ===== WHITE-LABEL CONFIG =====
   app.get('/api/config', (req, res) => {
     res.json({
-      appName: process.env.APP_NAME || 'The STEM Educator',
+      appName: process.env.APP_NAME || 'Hardware Blocks',
       companyName: process.env.COMPANY_NAME || '',
       instanceId: process.env.INSTANCE_ID || 'default'
     });

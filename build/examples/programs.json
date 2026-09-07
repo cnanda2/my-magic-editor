@@ -1,0 +1,147 @@
+{
+  "categories": [
+    {
+      "id": "beginner",
+      "title": "Beginner",
+      "icon": "🟢",
+      "color": "#4caf50",
+      "programs": [
+        {
+          "id": "led_blink",
+          "name": "LED Blink",
+          "description": "Blink the built-in LED on pin 13",
+          "image": "examples/beginner/led_blink.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "led_button",
+          "name": "LED + Button",
+          "description": "Control LED with a push button",
+          "image": "examples/beginner/led_button.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "traffic_light",
+          "name": "Traffic Light",
+          "description": "Red, Yellow, Green light sequence",
+          "image": "examples/beginner/traffic_light.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "buzzer",
+          "name": "Buzzer Melody",
+          "description": "Play beep patterns with PWM",
+          "image": "examples/beginner/buzzer.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "led_pattern",
+          "name": "LED Pattern",
+          "description": "Knight Rider running lights",
+          "image": "examples/beginner/led_pattern.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        }
+      ]
+    },
+    {
+      "id": "intermediate",
+      "title": "Intermediate",
+      "icon": "🔵",
+      "color": "#2196f3",
+      "programs": [
+        {
+          "id": "servo",
+          "name": "Servo Control",
+          "description": "Sweep servo motor 0° to 180°",
+          "image": "examples/intermediate/servo.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "ultrasonic",
+          "name": "Distance Sensor",
+          "description": "HC-SR04 ultrasonic distance measurement",
+          "image": "examples/intermediate/ultrasonic.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "led_fade",
+          "name": "LED Fade (PWM)",
+          "description": "Smooth brightness control with PWM",
+          "image": "examples/intermediate/led_fade.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "temperature",
+          "name": "Temperature Monitor",
+          "description": "LM35 sensor with LED alerts",
+          "image": "examples/intermediate/temperature.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "rgb_led",
+          "name": "RGB Color Mixer",
+          "description": "Mix colors with RGB LED",
+          "image": "examples/intermediate/rgb_led.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        },
+        {
+          "id": "light_sensor",
+          "name": "Light Sensor",
+          "description": "LDR controls LED brightness",
+          "image": "examples/intermediate/light_sensor.svg",
+          "board": "Arduino Uno / Nano / ESP32"
+        }
+      ]
+    },
+    {
+      "id": "advanced",
+      "title": "Advanced",
+      "icon": "🟣",
+      "color": "#9c27b0",
+      "programs": [
+        {
+          "id": "smart_light",
+          "name": "Smart Street Light",
+          "description": "Auto light with motion detection",
+          "image": "examples/advanced/smart_light.svg",
+          "board": "Arduino Uno / ESP32"
+        },
+        {
+          "id": "robot",
+          "name": "Obstacle Avoiding Robot",
+          "description": "Robot with ultrasonic sensor navigation",
+          "image": "examples/advanced/robot.svg",
+          "board": "Arduino Uno / Mega"
+        },
+        {
+          "id": "weather",
+          "name": "Weather Station",
+          "description": "Multi-sensor data logging",
+          "image": "examples/advanced/weather.svg",
+          "board": "Arduino Uno / ESP32"
+        },
+        {
+          "id": "wifi_esp32",
+          "name": "WiFi LED Control",
+          "description": "Control LED over WiFi (ESP32)",
+          "image": "examples/advanced/wifi_esp32.svg",
+          "board": "ESP32 only"
+        },
+        {
+          "id": "bluetooth_esp32",
+          "name": "Bluetooth Remote",
+          "description": "BLE multi-device control (ESP32)",
+          "image": "examples/advanced/bluetooth_esp32.svg",
+          "board": "ESP32 only"
+        },
+        {
+          "id": "line_follower",
+          "name": "Line Follower Robot",
+          "description": "IR sensors for line tracking",
+          "image": "examples/advanced/line_follower.svg",
+          "board": "Arduino Uno / Mega"
+        }
+      ]
+    }
+  ]
+}

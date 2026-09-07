@@ -13,15 +13,27 @@ class ArduinoCompiler {
   constructor(logger) {
     this.logger = logger;
     this.transpiler = new PythonTranspiler();
-    this.sketchDir = path.join(__dirname, '../../temp_sketches');
+    // Use writable temp dir — Program Files is not writable (EPERM). Fallback to os.tmpdir().
+    const preferTmp = path.join(os.tmpdir(), 'StemEducatorApp', 'temp_sketches');
+    const legacy = path.join(__dirname, '../../temp_sketches');
+    let chosen = preferTmp;
+    try {
+      if (!fs.existsSync(preferTmp)) fs.mkdirSync(preferTmp, { recursive: true });
+      this.sketchDir = preferTmp;
+    } catch (e) {
+      // Fallback to legacy if tmp fails, but handle EPERM gracefully
+      try {
+        if (!fs.existsSync(legacy)) fs.mkdirSync(legacy, { recursive: true });
+        this.sketchDir = legacy;
+      } catch (e2) {
+        this.logger && this.logger.warn && this.logger.warn(`Could not create sketchDir ${preferTmp} or ${legacy}: ${e2.message} — using tmp`);
+        this.sketchDir = preferTmp;
+        try { fs.mkdirSync(this.sketchDir, { recursive: true }); } catch (_) {}
+      }
+    }
     
     // Find arduino-cli
     this.cliPath = this.findArduinoCli();
-    
-    // Ensure temp directory exists
-    if (!fs.existsSync(this.sketchDir)) {
-      fs.mkdirSync(this.sketchDir, { recursive: true });
-    }
   }
 
   findArduinoCli() {

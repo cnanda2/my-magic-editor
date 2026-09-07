@@ -22,8 +22,11 @@ export function AuthProvider({ children }) {
       const token = decodeURIComponent(window.location.hash.slice('#token='.length));
       setToken(token);
       window.history.replaceState(null, '', window.location.pathname);
-      // Redirect to the hardware editor.
-      window.location.href = '/editor.html';
+      api.get('/auth/me').then(({ data }) => {
+        window.location.href = `/editor.html?tenant_id=${data.user?.tenant_id || ''}`;
+      }).catch(() => {
+        window.location.href = '/editor.html';
+      });
     }
   }, []);
 

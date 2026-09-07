@@ -257,7 +257,10 @@ function convertBlocksToCpp (vm, board) {
         }
         if (op === prefix + '_setServoAngle') {
             var sPin = getArgValue(block, 'PIN');
-            return [pad + 'servo_' + sPin + '.write(' + getArgValue(block, 'ANGLE') + ');'];
+            // servoVarLookup resolves the same (possibly disambiguated) name
+            // that was declared for this exact pin expression.
+            var sVar = (typeof servoVarLookup === 'function') ? servoVarLookup(sPin) : servoVar(sPin);
+            return [pad + sVar + '.write(' + getArgValue(block, 'ANGLE') + ');'];
         }
         if (op === prefix + '_playTone') {
             var tPin = getArgValue(block, 'PIN');
@@ -307,16 +310,52 @@ function convertBlocksToCpp (vm, board) {
         return [];
     }
 
-    // Detect servo pins for declarations
-    const servoPins = new Set();
+    // Servo object names must be valid C++ identifiers. The PIN slot can hold
+    // a nested reporter (e.g. digitalRead(7)) — using the raw expression as
+    // an identifier produced `Servo servo_digitalRead(7);` (compile error).
+    // Sanitize to identifier chars; attach() still gets the raw expression
+    // so even computed pins compile and work at runtime.
+    function servoVar (pinExpr) {
+        var id = String(pinExpr === undefined || pinExpr === null ? '' : pinExpr).replace(/[^A-Za-z0-9_]/g, '');
+        // 'servo_' prefix already guarantees a letter start, so digits are fine.
+        return 'servo_' + (id || 'x');
+    }
+
+    // Detect servo pins for declarations (map sanitized var name -> raw pin expr)
+    const servoPins = new Map();
     for (const b of Object.values(allBlocks)) {
         if (b.opcode === prefix + '_setServoAngle') {
             const pin = getArgValue(b, 'PIN');
-            if (pin && pin !== '0') servoPins.add(pin);
+            if (pin && pin !== '0') {
+                var v = servoVar(pin);
+                if (servoPins.has(v) && servoPins.get(v) !== pin) {
+                    // Collision between different exprs sanitizing alike — disambiguate
+                    var n = 2;
+                    while (servoPins.has(v + '_' + n) && servoPins.get(v + '_' + n) !== pin) n++;
+                    v = v + '_' + n;
+                }
+                // Re-resolve var for this block usage consistency: store per raw expr
+                if (!servoPins.has(v)) servoPins.set(v, pin);
+            }
         }
     }
+    // Helper used above in blockToLines must resolve same names: rebuild lookup
+    function servoVarLookup (pinExpr) {
+        var lookupName = servoVar(pinExpr);
+        if (servoPins.get(lookupName) === pinExpr) return lookupName;
+        for (const entry of servoPins.entries()) {
+            if (entry[1] === pinExpr) return entry[0];
+        }
+        return lookupName;
+    }
 
-    // Collect pins that need implicit pinMode
+    // Collect pins that need implicit pinMode.
+    // Only plain pins (number or identifier) get pinMode — computed expressions
+    // like digitalRead(7) are evaluated at runtime and must not become
+    // `pinMode(digitalRead(7), OUTPUT);`.
+    function isPlainPin (p) {
+        return typeof p === 'string' && (/^\d+$/.test(p) || /^[A-Za-z_][A-Za-z0-9_]*$/.test(p) || /^A\d+$/i.test(p));
+    }
     const outputPins = new Set();
     const inputPins = new Set();
     const explicitPins = new Set();
@@ -327,10 +366,10 @@ function convertBlocksToCpp (vm, board) {
             explicitPins.add(getArgValue(b, 'PIN'));
         } else if (bop === prefix + '_digitalWrite' || bop === prefix + '_analogWrite' || bop === prefix + '_playTone' || bop === prefix + '_setServoAngle') {
             const p = getArgValue(b, 'PIN');
-            if (p && p !== '0') outputPins.add(p);
+            if (p && p !== '0' && isPlainPin(p)) outputPins.add(p);
         } else if (bop === prefix + '_digitalRead' || bop === prefix + '_analogRead') {
             const p = getArgValue(b, 'PIN');
-            if (p && p !== '0') inputPins.add(p);
+            if (p && p !== '0' && isPlainPin(p)) inputPins.add(p);
         }
     }
     const implicitPinLines = [];
@@ -372,11 +411,17 @@ function convertBlocksToCpp (vm, board) {
     var code = '//This c++ code is generated\n\n';
     if (servoPins.size > 0) {
         code += '#include <Servo.h>\n\n';
-        servoPins.forEach(function (p) { code += 'Servo servo_' + p + ';\n'; });
+        servoPins.forEach(function (pinExpr, varName) { code += 'Servo ' + varName + ';\n'; });
         code += '\n';
     }
     code += 'void setup() {\n';
-    var allSetup = implicitPinLines.concat(implicitPinLines.length > 0 && setupLines.length > 0 ? [''] : []).concat(setupLines);
+    // Attach each servo to its pin (raw expression evaluated at runtime).
+    // Previously missing entirely, so servos compiled but never moved.
+    var servoAttachLines = [];
+    servoPins.forEach(function (pinExpr, varName) { servoAttachLines.push('\t' + varName + '.attach(' + pinExpr + ');'); });
+    var allSetup = implicitPinLines.concat(servoAttachLines)
+        .concat((implicitPinLines.length > 0 || servoAttachLines.length > 0) && setupLines.length > 0 ? [''] : [])
+        .concat(setupLines);
     code += allSetup.length > 0 ? (allSetup.join('\n') + '\n') : '\t//put your setup code here, to run once:\n\t\n\t\n';
     code += '}\n\nvoid loop() {\n';
     code += loopLines.length > 0 ? (loopLines.join('\n') + '\n') : '\t//put your main code here, to run repeatedly:\n\t\n\t\n';
@@ -392,6 +437,9 @@ const GUIComponent = props => {
     const [hwLogLines, setHwLogLines] = React.useState([]);
     const [hwCodeLocked, setHwCodeLocked] = React.useState(true);
     const hwLineNumRef = React.useRef(null);
+    // Guards the Firmware/Upload buttons against double-clicks: concurrent
+    // flashes fight over the COM port and ALL fail ("unable to open port").
+    const hwFlashBusyRef = React.useRef(false);
 
     const vmRef = React.useRef(props.vm);
     vmRef.current = props.vm;
@@ -830,11 +878,22 @@ const GUIComponent = props => {
                                             // eslint-disable-next-line react/jsx-no-bind
                                             onClick={async () => {
                                                 const ts = new Date().toLocaleTimeString();
+                                                if (hwFlashBusyRef.current) {
+                                                    setHwLogLines(prev => prev.concat('[' + ts + '] Upload already running - please wait...'));
+                                                    return;
+                                                }
+                                                hwFlashBusyRef.current = true;
                                                 setHwLogLines(prev => prev.concat('[' + ts + '] Starting firmware upload...'));
                                                 setHwBottomTab(0);
+                                                // Capture port BEFORE releasing Web Serial (disconnect clears it).
+                                                var port2 = window.__hardwareConnection && window.__hardwareConnection.port;
                                                 try {
+                                                    // Release the browser's Web Serial handle first so
+                                                    // avrdude/arduino-cli can open the port.
+                                                    if (window.__hardwareConnection && window.__hardwareConnection.disconnect) {
+                                                        try { await window.__hardwareConnection.disconnect(); } catch (_) {}
+                                                    }
                                                     const apiBase = window.location.protocol + '//' + window.location.hostname + ':3001/api';
-                                                    var port2 = window.__hardwareConnection?.port;
                                                     if (!port2) {
                                                         setHwLogLines(prev => prev.concat('[' + ts + '] ERROR: Not connected to any port. Connect your board first.'));
                                                         return;
@@ -869,6 +928,8 @@ const GUIComponent = props => {
                                                 } catch (e) {
                                                     const ts2 = new Date().toLocaleTimeString();
                                                     setHwLogLines(prev => prev.concat('[' + ts2 + '] ERROR: ' + e.message));
+                                                } finally {
+                                                    hwFlashBusyRef.current = false;
                                                 }
                                             }}
                                         >{'⚡ Firmware'}</button>
@@ -878,11 +939,22 @@ const GUIComponent = props => {
                                             // eslint-disable-next-line react/jsx-no-bind
                                             onClick={async () => {
                                                 const ts = new Date().toLocaleTimeString();
+                                                if (hwFlashBusyRef.current) {
+                                                    setHwLogLines(prev => prev.concat('[' + ts + '] Upload already running - please wait...'));
+                                                    return;
+                                                }
+                                                hwFlashBusyRef.current = true;
                                                 setHwLogLines(prev => prev.concat('[' + ts + '] Starting upload...'));
                                                 setHwBottomTab(0);
+                                                // Capture port BEFORE releasing Web Serial (disconnect clears it).
+                                                var port2 = window.__hardwareConnection && window.__hardwareConnection.port;
                                                 try {
+                                                    // Release the browser's Web Serial handle first so
+                                                    // avrdude/arduino-cli can open the port.
+                                                    if (window.__hardwareConnection && window.__hardwareConnection.disconnect) {
+                                                        try { await window.__hardwareConnection.disconnect(); } catch (_) {}
+                                                    }
                                                     const apiBase = window.location.protocol + '//' + window.location.hostname + ':3001/api';
-                                                    var port2 = window.__hardwareConnection?.port;
                                                     
                                                     // Detect COM Port - if not connected, show port picker
                                                     if (!port2) {
@@ -965,6 +1037,8 @@ const GUIComponent = props => {
                                                 } catch (e) {
                                                     const ts2 = new Date().toLocaleTimeString();
                                                     setHwLogLines(prev => prev.concat('[' + ts2 + '] ERROR: ' + e.message));
+                                                } finally {
+                                                    hwFlashBusyRef.current = false;
                                                 }
                                             }}
                                         >{'⬆ Upload Code'}</button>

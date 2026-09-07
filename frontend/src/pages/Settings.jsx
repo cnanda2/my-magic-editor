@@ -13,30 +13,58 @@ const ROLES = [
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('General');
-  const [subdomain, setSubdomain] = useState('my-institution');
   const [customDomain, setCustomDomain] = useState('');
-  const [platformHost, setPlatformHost] = useState(window.location.hostname || 'localhost');
-  const [cnameTarget, setCnameTarget] = useState(window.location.hostname || 'localhost');
+  const defaultHost = import.meta.env.VITE_PLATFORM_HOST || (window.location.hostname !== 'localhost' ? window.location.hostname : '');
+  const [platformHost, setPlatformHost] = useState(defaultHost);
+  const [cnameTarget, setCnameTarget] = useState(defaultHost);
   const [webhookUrl] = useState(`${window.location.origin}/api/webhooks/subscription-events`);
   const [webhookActive] = useState(true);
   const [autoRetry, setAutoRetry] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Branding state
+  const [logoUrl, setLogoUrl] = useState('');
+  const [faviconUrl, setFaviconUrl] = useState('');
+  const [logoFile, setLogoFile] = useState(null);
+  const [faviconFile, setFaviconFile] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+
   useEffect(() => {
     api.get('/tenant/config').then((r) => {
-      if (r.data?.platformHost) setPlatformHost(r.data.platformHost);
-      if (r.data?.cnameTarget) setCnameTarget(r.data.cnameTarget);
+      const ph = r.data?.platformHost;
+      const ct = r.data?.cnameTarget || ph;
+      if (ph && ph !== 'localhost') setPlatformHost(ph);
+      if (ct && ct !== 'localhost') setCnameTarget(ct);
       if (r.data?.tenantId) {
         const cd = (r.data.config && r.data.config.customDomain) || '';
         if (cd) {
           setCustomDomain(cd);
-          if (cd.endsWith('.' + r.data.platformHost)) {
-            setSubdomain(cd.replace('.' + r.data.platformHost, ''));
-          }
         }
       }
+      if (r.data?.logoUrl) setLogoUrl(r.data.logoUrl);
+      if (r.data?.faviconUrl) setFaviconUrl(r.data.faviconUrl);
     }).catch(() => {});
   }, []);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      toast.error('Enter your current and new password.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+      toast.success('Password updated.');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not update password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   // Billing API state
   const [apiKey] = useState('sk_live_TSE3k8fH2s9mX5nR7vL1pQ');
@@ -46,6 +74,9 @@ export default function Settings() {
   const [apiUsage] = useState({ used: 8472, limit: 10000 });
 
   // Security state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
   const [minPasswordLength, setMinPasswordLength] = useState('12');
   const [requireSpecial, setRequireSpecial] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState('60');
@@ -71,27 +102,59 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.post('/admin/settings', {
-        subdomain: `${subdomain}.${platformHost}`,
+      await api.patch('/tenant/settings', {
         customDomain,
-        autoRetry,
-        minPasswordLength,
-        requireSpecial,
-        sessionTimeout,
-        mfaEnabled,
-        ssoEnabled,
-        auditRetention,
-        rateLimit,
-        emailAlerts,
-        slackWebhook,
-        digestFreq,
-        alertThreshold,
+        logo_url: logoUrl,
+        favicon_url: faviconUrl,
+        config: {
+          customDomain,
+        }
       });
       toast.success('Settings saved successfully');
     } catch {
       toast.error('Failed to save settings');
     }
     setSaving(false);
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setUploadingLogo(true);
+    const form = new FormData();
+    form.append('logo', file);
+    try {
+      const res = await api.post('/tenant/logo', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setLogoUrl(res.data.url || res.data.logoUrl || '');
+      toast.success('Logo uploaded');
+    } catch {
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleFaviconUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFaviconFile(file);
+    setUploadingFavicon(true);
+    const form = new FormData();
+    form.append('favicon', file);
+    try {
+      const res = await api.post('/tenant/favicon', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setFaviconUrl(res.data.url || res.data.faviconUrl || '');
+      toast.success('Favicon uploaded');
+    } catch {
+      toast.error('Failed to upload favicon');
+    } finally {
+      setUploadingFavicon(false);
+    }
   };
 
   return (
@@ -131,22 +194,48 @@ export default function Settings() {
                   <span className="material-symbols-outlined text-stem-orange text-[22px]">dns</span>
                   <h2 className="text-label-md text-deep-navy uppercase tracking-wider">Domain Configuration</h2>
                 </div>
-                <div className="mb-5">
-                  <label className="text-body-sm text-on-surface-variant font-medium block mb-2">Institution Subdomain</label>
-                  <div className="flex items-center">
-                    <input type="text" value={subdomain} onChange={(e) => setSubdomain(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))} placeholder="your-institution" className="flex-1 px-3 py-2.5 border border-outline-variant/50 rounded-l-lg text-body-md text-deep-navy focus:outline-none focus:ring-2 focus:ring-stem-orange/40 focus:border-stem-orange transition-all" />
-                    <div className="px-3 py-2.5 bg-surface-container border border-l-0 border-outline-variant/50 rounded-r-lg text-body-sm text-on-surface-variant font-mono whitespace-nowrap">.{platformHost}</div>
-                  </div>
-                  <p className="text-body-sm text-on-surface-variant/70 mt-1.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">info</span> Your dedicated portal URL
-                  </p>
-                </div>
                 <div>
                   <label className="text-body-sm text-on-surface-variant font-medium block mb-2">Custom Domain (CNAME)</label>
                   <input type="text" value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="login.yourinstitution.edu" className="w-full px-3 py-2.5 border border-outline-variant/50 rounded-lg text-body-md text-deep-navy focus:outline-none focus:ring-2 focus:ring-stem-orange/40 focus:border-stem-orange transition-all" />
                   <p className="text-body-sm text-on-surface-variant/70 mt-1.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">language</span> Point a CNAME record to <span className="font-mono text-deep-navy">{cnameTarget}</span>
+                    <span className="material-symbols-outlined text-[14px]">language</span> Point a CNAME record to <span className="font-mono text-deep-navy">{cnameTarget || 'your-platform-host.com'}</span>
                   </p>
+                </div>
+              </div>
+
+              {/* Branding */}
+              <div className="bg-pure-white rounded-xl border border-outline-variant/20 shadow p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="material-symbols-outlined text-stem-orange text-[22px]">palette</span>
+                  <h2 className="text-label-md text-deep-navy uppercase tracking-wider">Branding</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-body-sm text-on-surface-variant font-medium block mb-2">Logo</label>
+                    <div className="flex items-center gap-4">
+                      {logoUrl && (
+                        <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain border border-outline-variant/30 rounded-lg bg-surface-container-low p-1" />
+                      )}
+                      <div className="flex-1">
+                        <input type="file" accept="image/*" onChange={handleLogoUpload} className="block w-full text-body-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-body-sm file:font-semibold file:bg-stem-orange/10 file:text-stem-orange hover:file:bg-stem-orange hover:file:text-pure-white transition-all" />
+                        <p className="text-label-sm text-on-surface-variant/70 mt-1">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                    {uploadingLogo && <p className="text-label-sm text-stem-orange mt-2">Uploading logo...</p>}
+                  </div>
+                  <div>
+                    <label className="text-body-sm text-on-surface-variant font-medium block mb-2">Favicon</label>
+                    <div className="flex items-center gap-4">
+                      {faviconUrl && (
+                        <img src={faviconUrl} alt="Favicon" className="w-10 h-10 object-contain border border-outline-variant/30 rounded bg-surface-container-low p-1" />
+                      )}
+                      <div className="flex-1">
+                        <input type="file" accept="image/*" onChange={handleFaviconUpload} className="block w-full text-body-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-body-sm file:font-semibold file:bg-indigo-accent/10 file:text-indigo-accent hover:file:bg-indigo-accent hover:file:text-pure-white transition-all" />
+                        <p className="text-label-sm text-on-surface-variant/70 mt-1">PNG, ICO, SVG up to 1MB</p>
+                      </div>
+                    </div>
+                    {uploadingFavicon && <p className="text-label-sm text-indigo-accent mt-2">Uploading favicon...</p>}
+                  </div>
                 </div>
               </div>
 
@@ -401,6 +490,30 @@ export default function Settings() {
         {activeTab === 'Security' && (
           <div className="grid grid-cols-12 gap-gutter">
             <div className="col-span-12 lg:col-span-8 space-y-stack-md">
+              {/* Change Your Password */}
+              <div className="bg-pure-white rounded-xl border border-outline-variant/20 shadow p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="material-symbols-outlined text-stem-orange text-[22px]">password</span>
+                  <h2 className="text-label-md text-deep-navy uppercase tracking-wider">Change Your Password</h2>
+                </div>
+                <form onSubmit={handleChangePassword} className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-end">
+                  <div>
+                    <label className="text-body-sm text-on-surface-variant font-medium block mb-2">Current Password</label>
+                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" className="w-full px-3 py-2.5 border border-outline-variant/50 rounded-lg text-body-md text-deep-navy focus:outline-none focus:ring-2 focus:ring-stem-orange/40 focus:border-stem-orange transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-body-sm text-on-surface-variant font-medium block mb-2">New Password</label>
+                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" minLength={8} className="w-full px-3 py-2.5 border border-outline-variant/50 rounded-lg text-body-md text-deep-navy focus:outline-none focus:ring-2 focus:ring-stem-orange/40 focus:border-stem-orange transition-all" />
+                  </div>
+                  <div>
+                    <button type="submit" disabled={changingPassword} className="w-full px-4 py-2.5 rounded-lg bg-stem-orange text-pure-white text-body-md font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
+                      {changingPassword ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </form>
+                <p className="text-body-sm text-on-surface-variant/70 mt-2">Minimum 8 characters. Takes effect immediately - you'll stay signed in.</p>
+              </div>
+
               {/* Password Policy */}
               <div className="bg-pure-white rounded-xl border border-outline-variant/20 shadow p-6">
                 <div className="flex items-center gap-2 mb-6">

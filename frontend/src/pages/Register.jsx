@@ -2,12 +2,17 @@ import { useState } from 'react';
 import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useBrand } from '../context/BrandContext';
 
 export default function Register() {
   const { register } = useAuth();
+  const brand = useBrand();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const appName = brand?.appName || 'Hardware Blocks';
+  const logoUrl = brand?.logoUrl || '/logo.png';
+  const primaryColor = brand?.primaryColor || '#EA8E0A';
   // Allow pre-selecting a role, e.g. /register?role=Student (from "Add Student")
   const presetRole = searchParams.get('role') || 'user';
   const isStudent = presetRole === 'Student';
@@ -72,7 +77,7 @@ export default function Register() {
         <section className="relative hidden lg:flex flex-col justify-between p-stack-lg bg-deep-navy text-white overflow-hidden">
           <div className="z-10">
             <div className="bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl inline-block border border-white/20 mb-stack-lg">
-              <img src="/logo.png" alt="The STEM Educator" className="h-8 w-auto" />
+              <img src={logoUrl} alt={appName} className="h-8 w-auto object-contain" />
             </div>
             <h2 className="text-headline-xl leading-tight mt-stack-lg">
               Empowering the next<br />generation of <span className="text-stem-orange">innovators.</span>
@@ -102,8 +107,8 @@ export default function Register() {
             </h1>
             <p className="text-body-md text-on-surface-variant">
               {isStudent
-                ? 'Create a new student account for The STEM Educator platform.'
-                : 'Join our community of over 10,000 STEM educators.'}
+                ? `Create a new student account for ${appName}.`
+                : 'Join our community and start building with hardware blocks.'}
             </p>
           </header>
 
@@ -157,7 +162,8 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-stem-orange hover:brightness-95 text-white text-headline-sm rounded-lg shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full py-3 hover:brightness-95 text-white text-headline-sm rounded-lg shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: primaryColor }}
             >
               {loading ? (
                 <><span className="material-symbols-outlined animate-spin">progress_activity</span> Setting up profile…</>
