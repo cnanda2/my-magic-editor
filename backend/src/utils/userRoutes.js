@@ -173,8 +173,14 @@ function setupUserRoutes(app) {
         return res.status(403).json({ error: `User limit of ${limit} reached. Contact your Super Admin to increase the limit.` });
       }
 
-      const { username, email, password, full_name, role = 'user', department, institution } = req.body || {};
+      const { username, email, password, full_name, role: requestedRole, department, institution } = req.body || {};
       if (!username || !email) return res.status(400).json({ error: 'username and email are required' });
+      // Self-service tenant user creation must never be able to grant admin-tier
+      // access (Super Admin has zero tenant scoping anywhere in the codebase - a
+      // Tenant Admin passing role: 'Super Admin' here would create a full
+      // platform-wide admin account). The UI never offers these roles either.
+      const ADMIN_TIER_ROLES = ['admin', 'System Admin', 'Super Admin', 'Tenant Admin'];
+      const role = (requestedRole && !ADMIN_TIER_ROLES.includes(requestedRole)) ? requestedRole : 'user';
       const { rows: exists } = await query('SELECT 1 FROM users WHERE LOWER(email) = LOWER($1)', [email]);
       if (exists[0]) return res.status(409).json({ error: 'Email already in use' });
       const password_hash = password ? await bcrypt.hash(password, 10) : null;
@@ -255,7 +261,11 @@ function setupUserRoutes(app) {
     }
   });
 
+  // roles is a single global, platform-wide catalog (no tenant_id column, names
+  // are globally unique) - a Tenant Admin editing it would affect every tenant's
+  // available roles and permission definitions, not just their own.
   app.post('/api/admin/roles', authRequired, requireRole(), async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const { name, description, permissions = {} } = req.body || {};
       if (!name) return res.status(400).json({ error: 'name is required' });
@@ -275,6 +285,7 @@ function setupUserRoutes(app) {
   });
 
   app.patch('/api/admin/roles/:id', authRequired, requireRole(), async (req, res) => {
+    if (!isSuperAdmin(req)) return res.status(403).json({ error: 'Super Admin access required' });
     try {
       const sets = [];
       const params = [];
@@ -305,14 +316,16 @@ function setupUserRoutes(app) {
       const limit = Math.min(parseInt(pageSize, 10) || 10, 100);
       const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit;
 
-      // Tenant Admin: only see non-admin activity in their tenant + their own
+      // Tenant Admin: only see non-admin activity in their tenant + their own.
+      // Previously missing the tenant_id filter entirely, leaking every other
+      // tenant's user-level activity to any Tenant Admin viewing this page.
       const isSuper = isSuperAdmin(req);
       let whereClause = '';
       const params = [];
       if (!isSuper) {
         const tid = req.auth.tenant_id;
-        whereClause = 'WHERE (actor_role NOT IN ($1, $2)) OR user_id = $3';
-        params.push('Super Admin', 'Tenant Admin', req.auth.sub);
+        params.push(tid, 'Super Admin', 'Tenant Admin', req.auth.sub);
+        whereClause = 'WHERE tenant_id = $1 AND ((actor_role NOT IN ($2, $3)) OR user_id = $4)';
       }
 
       const [{ rows: logs }, { rows: count }] = await Promise.all([
